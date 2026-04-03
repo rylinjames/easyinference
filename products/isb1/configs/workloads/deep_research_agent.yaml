@@ -1,0 +1,72 @@
+# Deep Research Agent workload — parameterized from MiroThinker trace analysis
+# (see inferscope/docs/mirothinker_v1.7_2026-03-28/06_trace_collection_v1.7_2026-03-28.md)
+#
+# Distinguishing characteristics vs generic "agent" workload:
+# - Long sessions: 100-300 turns (vs 3-8 for generic agent)
+# - Stable steady-state context: plateaus at 50-70K tokens (vs linear growth to 15K)
+# - Short outputs per turn: 200-500 tokens (action selection, not long-form generation)
+# - High prefix cache hit rate: fixed system prompt + rolling-window message structure
+# - Heavy web tool use: search + scrape dominate tool calls
+# - Occasional session restart with summary (retry_with_summary pattern)
+
+workload_name: "deep_research_agent"
+workload_id: "wl5"
+description: "Long-running deep research agent with 100-300 turn sessions, derived from MiroThinker trace characteristics"
+
+trace:
+  type: "synthetic_deep_research_agent"
+  generator: "workloads.deep_research_agent.DeepResearchAgentGenerator"
+  seed: 42
+  num_requests: 2000
+  system_prompt_tokens: 1200  # larger system prompt with research instructions + tool schemas
+  user_query_tokens:
+    min: 50
+    max: 200   # short queries: "search for X", "scrape URL Y"
+  tool_schemas:
+    - "schemas/search.json"
+    - "schemas/code_execute.json"
+    - "schemas/file_read.json"
+  tool_schema_total_tokens: 2500
+  turns:
+    min: 100
+    max: 300
+  tool_result_tokens:
+    min: 1000
+    max: 5000  # web scrape results can be large
+  rolling_window_size: 5  # keep last 5 tool results in context (MiroThinker pattern)
+  retry_with_summary_probability: 0.05  # 5% chance of session restart with summary
+
+context:
+  input_tokens:
+    start: 2000
+    # Context ramps in first ~5 turns as rolling window fills, then plateaus
+    plateau: 60000   # steady-state context in 50-70K range
+    max: 70000
+    growth: "ramp_then_plateau"
+  output_tokens:
+    median: 300      # short outputs: action selection + tool invocation
+    min: 100
+    max: 500
+
+arrival:
+  model: "gamma"
+  shape: 1.5
+  # Lower rates than generic agent — each session is long-running
+  rate_sweep: [0.25, 0.5, 1, 2, 4, 8, 16]
+
+session:
+  sticky: true
+  prefix_reuse: true
+  prefix_shared_tokens: 3500  # system prompt + tool schemas (high reuse)
+  expected_prefix_cache_hit_rate: 0.85  # high due to stable system prompt
+
+sampling:
+  temperature: 0.0  # greedy for tool-calling determinism
+  max_tokens: 512   # shorter max than generic agent
+
+slo:
+  ttft_p95_ms: 2000   # higher TTFT budget for long context prefill
+  tpot_p95_ms: 50     # tight ITL for interactive feel
+
+priority: "latency"
+timeout_seconds: 600  # longer timeout for long sessions

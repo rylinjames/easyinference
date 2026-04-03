@@ -1,0 +1,13 @@
+gpu_name: "H200-SXM-141GB"
+gpu_short: "h200"
+compute_capability: "sm_90a"
+hbm_capacity_gb: 141
+hbm_bandwidth_tbs: 4.8
+nvlink_generation: 4
+nvlink_bandwidth_gbs: 900
+tdp_watts: 700
+fp8_support: true
+nvfp4_support: false
+fp_formats: ["bf16", "fp16", "fp8_e4m3", "fp8_e5m2"]
+kv_cache_dtypes: ["auto", "fp8_e5m2"]
+max_gpus_per_node: 8

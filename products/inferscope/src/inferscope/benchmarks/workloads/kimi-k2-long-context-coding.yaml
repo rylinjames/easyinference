@@ -1,0 +1,80 @@
+version: "1"
+name: kimi-k2-long-context-coding
+description: Long-context coding workload for Kimi-K2.5 focused on repo-wide reasoning, patch planning, and cache reuse.
+workload_class: coding
+benchmark_role: production
+target_gpu_families: [hopper, blackwell, blackwell_ultra]
+target_model_classes: [classical_moe]
+focus_areas: [long_context, coding, prefix_cache, lmcache, reliability, observability]
+model: Kimi-K2.5
+concurrency: 4
+stream: true
+tags:
+  - kimi
+  - dynamo
+  - coding
+  - long-context
+  - production
+requests:
+  - name: repo-diagnosis
+    session_id: kimi-coding-session-a
+    max_tokens: 512
+    metadata:
+      approx_context_tokens: 65536
+    messages:
+      - role: system
+        content: |
+          You are a production coding assistant operating on a large monorepo.
+          Preserve exact file paths, keep edits minimal, and call out reliability regressions.
+
+          # Repository digest
+          services/gateway/router.py: request routing and admission control
+          services/runtime/worker.py: long-context generation and cache plumbing
+          services/runtime/kv_router.py: cache-aware worker selection
+          observability/prometheus.py: metric export and label hygiene
+          observability/tracing.py: distributed trace propagation and request IDs
+          benches/replay.py: OpenAI-compatible replay harness
+      - role: user
+        content: |
+          Review the repository context and identify the first failure mode that would break long-context
+          coding reliability under sustained prefix reuse.
+  - name: patch-plan
+    session_id: kimi-coding-session-a
+    max_tokens: 640
+    metadata:
+      approx_context_tokens: 65536
+    messages:
+      - role: system
+        content: |
+          You are a production coding assistant operating on a large monorepo.
+          Preserve exact file paths, keep edits minimal, and call out reliability regressions.
+      - role: user
+        content: |
+          Review the repository context and identify the first failure mode that would break long-context
+          coding reliability under sustained prefix reuse.
+      - role: assistant
+        content: The most likely first failure is decode-side saturation hiding behind healthy aggregate throughput.
+      - role: user
+        content: |
+          Produce the smallest patch plan and validation sequence to prevent that failure from escaping into production.
+  - name: diff-review
+    session_id: kimi-coding-session-b
+    max_tokens: 640
+    metadata:
+      approx_context_tokens: 131072
+    messages:
+      - role: system
+        content: |
+          You are a production coding assistant operating on a large monorepo.
+          Prefer exact diffs, rollout safety, and observability coverage.
+
+          # Repository digest
+          apps/mcp/server.py: request ingress and auth
+          apps/mcp/session_router.py: sticky-session mapping
+          apps/mcp/prefill_pool.py: prefill worker orchestration
+          apps/mcp/decode_pool.py: decode worker orchestration
+          apps/mcp/metrics.py: Prometheus + OpenTelemetry plumbing
+      - role: user
+        content: |
+          Given this repository context, explain how you would split prefill and decode safely while preserving
+          cache reuse for multi-turn coding sessions.

@@ -1,0 +1,60 @@
+version: "1"
+name: coding-long-context
+description: Long-context repository coding workload focused on large codebase review, cache reuse, and patch planning.
+workload_class: coding
+benchmark_role: reference
+target_gpu_families: [hopper, hopper_grace, blackwell, blackwell_ultra, blackwell_grace, blackwell_ultra_grace, cdna3, cdna4]
+target_model_classes: [qwen35_hybrid, frontier_mla_moe, compact_agentic_moe]
+focus_areas: [long_context, prefix_cache, ttft, patch_planning]
+model: Qwen3.5-32B
+concurrency: 2
+stream: true
+tags:
+  - coding
+  - long-context
+  - prefix-cache
+  - benchmark-bridge
+requests:
+  - name: repo-review-seed
+    session_id: coding-session-1
+    max_tokens: 320
+    metadata:
+      approx_context_tokens: 32768
+    messages:
+      - role: system
+        content: |
+          You are an inference optimization engineer. Prefer precise diffs and short rationale.
+
+          # === CODEBASE START ===
+          src/server.py: benchmark entrypoints and replay orchestration
+          src/cache.py: KV cache planner and allocator
+          src/telemetry.py: latency and power collection
+          # === CODEBASE END ===
+      - role: user
+        content: |
+          Review the repository context and identify the first implementation change needed to reduce
+          long-context TTFT without hurting cache reuse.
+  - name: follow-up-fix-plan
+    session_id: coding-session-1
+    max_tokens: 420
+    metadata:
+      approx_context_tokens: 32768
+    messages:
+      - role: system
+        content: |
+          You are an inference optimization engineer. Prefer precise diffs and short rationale.
+
+          # === CODEBASE START ===
+          src/server.py: benchmark entrypoints and replay orchestration
+          src/cache.py: KV cache planner and allocator
+          src/telemetry.py: latency and power collection
+          # === CODEBASE END ===
+      - role: user
+        content: |
+          Review the repository context and identify the first implementation change needed to reduce
+          long-context TTFT without hurting cache reuse.
+      - role: assistant
+        content: The main bottleneck is prefill pressure across the shared repo context.
+      - role: user
+        content: |
+          Given the same repository context, produce the minimal patch plan and validation sequence.

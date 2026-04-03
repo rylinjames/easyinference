@@ -1,0 +1,57 @@
+workload_name: "agent"
+workload_id: "wl2"
+description: "Multi-turn agentic workload with structured tool-calling"
+
+trace:
+  type: "synthetic_agent"
+  generator: "workloads.agent.AgentTraceGenerator"
+  seed: 42
+  num_requests: 1000
+  system_prompt_tokens: 800
+  user_query_tokens:
+    min: 100
+    max: 500
+  tool_schemas:
+    - "schemas/search.json"
+    - "schemas/code_execute.json"
+    - "schemas/file_read.json"
+    - "schemas/database_query.json"
+    - "schemas/api_call.json"
+  tool_schema_total_tokens: 2000
+  turns:
+    min: 3
+    max: 8
+  tool_result_tokens:
+    min: 500
+    max: 2000
+
+context:
+  input_tokens:
+    start: 1500
+    end: 15000
+    growth: "linear_per_turn"
+  output_tokens:
+    median: 400
+    min: 100
+    max: 1500
+
+arrival:
+  model: "gamma"
+  shape: 2
+  rate_sweep: [0.5, 1, 2, 4, 8, 16, 32, 64]
+
+session:
+  sticky: true
+  prefix_reuse: true
+  prefix_shared_tokens: 2000  # tool schema prefix
+
+sampling:
+  temperature: 0.0  # greedy for tool-calling determinism
+  max_tokens: 2048
+
+slo:
+  ttft_p95_ms: 1500
+  tpot_p95_ms: 80
+
+priority: "latency"
+timeout_seconds: 180

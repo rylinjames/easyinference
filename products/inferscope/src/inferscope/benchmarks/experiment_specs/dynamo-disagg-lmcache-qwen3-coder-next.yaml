@@ -1,0 +1,46 @@
+version: "1"
+name: dynamo-disagg-lmcache-qwen3-coder-next
+description: Disaggregated Dynamo serving for Qwen3-Coder-Next (80B-A3B hybrid) with LMCache and BF16 KV cache on H200.
+engine: dynamo
+workload: qwen3-coder-kv-stress
+benchmark_role: benchmark
+model: Qwen3-Coder-Next
+target_gpu_families: [hopper, blackwell, blackwell_ultra]
+target_model_classes: [qwen35_hybrid]
+focus_areas: [disaggregation, lmcache, long_context, coding, hybrid_attention, kv_cache]
+topology:
+  mode: prefill_decode_split
+  session_routing: sticky
+  session_header_name: X-Session-ID
+  request_target_name: primary
+  kv_connector: LMCacheConnectorV1
+  notes:
+    - Hybrid attention model — 12/48 layers have standard KV cache, 36 use Gated DeltaNet fixed state.
+    - FP8 KV cache not supported for this architecture; use BF16 KV.
+    - DeltaNet recurrent state is ~18 MB/sequence (fixed, independent of sequence length).
+cache:
+  strategy: lmcache
+  tiers: [gpu_hbm, cpu_dram]
+  connector: LMCacheConnectorV1
+  session_affinity: true
+  prefix_cache_expected: true
+  notes:
+    - BF16 KV required — FP8 KV quantization not yet supported for Qwen3-Next architecture.
+    - CPU DRAM tier recommended for sessions exceeding GPU KV headroom.
+metrics_targets:
+  - name: primary
+    role: primary
+    endpoint_source: named_override
+    override_key: frontend
+    expected_engine: dynamo
+  - name: prefill
+    role: prefill
+    endpoint_source: named_override
+    override_key: prefill
+    expected_engine: dynamo
+  - name: decode
+    role: decode
+    endpoint_source: named_override
+    override_key: decode
+    expected_engine: dynamo
+tags: [dynamo, disagg, lmcache, qwen3-coder-next, hybrid, coding, benchmark]

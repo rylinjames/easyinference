@@ -1,0 +1,38 @@
+version: "1"
+name: legal-review
+description: Repeated long-document legal review and extraction workload.
+workload_class: legal_review
+benchmark_role: reference
+target_gpu_families: [ampere, hopper, hopper_grace, blackwell, blackwell_ultra, blackwell_grace, blackwell_ultra_grace, cdna3, cdna4]
+target_model_classes: [dense_gqa, qwen35_hybrid, frontier_mla_moe]
+focus_areas: [rag, long_context, compliance]
+model: Llama-3-70B
+concurrency: 1
+stream: true
+tags:
+  - legal
+  - long-doc
+  - compliance
+requests:
+  - name: contract-risk-pass
+    session_id: legal-session-1
+    max_tokens: 320
+    temperature: 0.0
+    messages:
+      - role: system
+        content: You are a legal operations assistant. Extract risk clauses and preserve exact wording.
+      - role: user
+        content: |
+          Review the supplied contract corpus and extract indemnity, termination, and
+          liability clauses with concise summaries.
+  - name: contract-follow-up
+    session_id: legal-session-1
+    max_tokens: 220
+    temperature: 0.0
+    messages:
+      - role: system
+        content: You are a legal operations assistant. Extract risk clauses and preserve exact wording.
+      - role: user
+        content: |
+          Using the same contract corpus, identify any conflicts between indemnity and
+          limitation-of-liability language.

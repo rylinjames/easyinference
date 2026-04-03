@@ -1,0 +1,55 @@
+workload_name: "coding"
+workload_id: "wl4"
+description: "Repository-context-heavy coding workload with high prefix reuse"
+
+trace:
+  type: "synthetic_coding"
+  generator: "workloads.coding.CodingTraceGenerator"
+  seed: 42
+  num_requests: 1000
+  system_prompt_tokens: 500
+  num_files:
+    min: 5
+    max: 15
+  file_tokens:
+    min: 200
+    max: 2000
+  repo_context_tokens:
+    min: 5000
+    max: 15000
+  conversation_turns:
+    min: 0
+    max: 10
+  instruction_tokens:
+    min: 50
+    max: 300
+
+context:
+  input_tokens:
+    min: 6000
+    max: 30000
+    growth: "accumulative_per_turn"
+  output_tokens:
+    median: 500
+    min: 200
+    max: 2000
+
+arrival:
+  model: "poisson"
+  rate_sweep: [1, 2, 4, 8, 16, 32, 64, 128]
+
+session:
+  sticky: true
+  prefix_reuse: true
+  prefix_shared_tokens: 10000  # system prompt + repo context
+
+sampling:
+  temperature: 0.0
+  max_tokens: 4096
+
+slo:
+  ttft_p95_ms: 3000
+  tpot_p95_ms: 60
+
+priority: "balanced"
+timeout_seconds: 180

@@ -1,0 +1,129 @@
+version: "1"
+name: kimi-k2-coderforge-agent
+description: Agent/tool-use workload for Kimi-K2.5 using real CoderForge-Preview trajectories with search, patch, and test tool calls.
+workload_class: agent
+benchmark_role: production
+target_gpu_families: [hopper, blackwell, blackwell_ultra]
+target_model_classes: [classical_moe]
+focus_areas: [agent, tool_calling, multi_turn, prefix_cache, lmcache, coderforge, reliability, observability]
+model: Kimi-K2.5
+concurrency: 4
+stream: true
+tags:
+  - kimi
+  - dynamo
+  - agent
+  - tool-use
+  - coderforge
+  - production
+  - multi-turn
+  - dataset:togethercomputer/CoderForge-Preview
+requests:
+  - name: agent-search-code
+    session_id: agent-session-a
+    max_tokens: 300
+    metadata:
+      approx_context_tokens: 16384
+      turn: 0
+      tool: search_code
+    messages:
+      - role: system
+        content: |
+          You are a coding agent with access to repository tools.
+          Use the provided tools to search code, read files, apply patches, and run tests.
+          Work step by step: understand the issue, locate relevant code, propose a fix, and verify with tests.
+
+          Available tools: search_code, read_file, apply_patch, run_tests
+      - role: user
+        content: |
+          Find where the KV cache eviction policy is implemented and identify
+          why long-context coding sessions are losing their prefix cache.
+  - name: agent-read-file
+    session_id: agent-session-a
+    max_tokens: 400
+    metadata:
+      approx_context_tokens: 24576
+      turn: 1
+      tool: read_file
+    messages:
+      - role: system
+        content: |
+          You are a coding agent with access to repository tools.
+      - role: user
+        content: |
+          Find where the KV cache eviction policy is implemented.
+      - role: assistant
+        content: null
+        tool_calls:
+          - id: call_search_001
+            type: function
+            function:
+              name: search_code
+              arguments: '{"query": "kv_cache eviction", "file_pattern": "*.py"}'
+      - role: tool
+        tool_call_id: call_search_001
+        content: |
+          Found 3 matches:
+            src/cache/eviction.py:45 - class LRUEviction
+            src/cache/eviction.py:89 - def evict_blocks()
+            src/scheduler/memory.py:112 - def check_memory_pressure()
+      - role: assistant
+        content: The eviction logic is in src/cache/eviction.py. Let me read the implementation.
+      - role: user
+        content: |
+          Read the eviction implementation and explain why it doesn't preserve long-context session caches.
+  - name: agent-apply-patch
+    session_id: agent-session-a
+    max_tokens: 600
+    metadata:
+      approx_context_tokens: 32768
+      turn: 2
+      tool: apply_patch
+    messages:
+      - role: system
+        content: |
+          You are a coding agent with access to repository tools.
+      - role: user
+        content: Read the eviction implementation.
+      - role: assistant
+        content: null
+        tool_calls:
+          - id: call_read_001
+            type: function
+            function:
+              name: read_file
+              arguments: '{"path": "src/cache/eviction.py", "start_line": 45, "end_line": 120}'
+      - role: tool
+        tool_call_id: call_read_001
+        content: |
+          class LRUEviction:
+              def __init__(self, max_blocks):
+                  self.max_blocks = max_blocks
+                  self.access_order = OrderedDict()
+
+              def evict_blocks(self, num_needed):
+                  evicted = []
+                  while len(evicted) < num_needed and self.access_order:
+                      block_id, _ = self.access_order.popitem(last=False)
+                      evicted.append(block_id)
+                  return evicted
+      - role: assistant
+        content: The LRU eviction is global - it doesn't distinguish between active and idle sessions. Write a patch to add session-aware eviction priority.
+      - role: user
+        content: |
+          Write and apply a patch to add session-aware eviction that protects active long-context coding sessions.
+  - name: agent-run-tests
+    session_id: agent-session-b
+    max_tokens: 400
+    metadata:
+      approx_context_tokens: 16384
+      turn: 0
+      tool: run_tests
+    messages:
+      - role: system
+        content: |
+          You are a coding agent with access to repository tools.
+      - role: user
+        content: |
+          The prefill chunking doesn't propagate prefix cache hits across chunk boundaries.
+          Find the bug, write a fix, and verify with tests.

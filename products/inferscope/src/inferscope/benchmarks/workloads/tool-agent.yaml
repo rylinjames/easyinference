@@ -1,0 +1,69 @@
+version: "1"
+name: tool-agent
+description: Multi-turn tool-calling agent workload for MCP-style planning, code search, and patch execution.
+workload_class: tool_agent
+benchmark_role: reference
+target_gpu_families: [hopper, hopper_grace, blackwell, blackwell_ultra, blackwell_grace, blackwell_ultra_grace, cdna3, cdna4]
+target_model_classes: [frontier_mla_moe, compact_agentic_moe, qwen35_hybrid]
+focus_areas: [mcp, tool_calling, session_reuse]
+model: DeepSeek-R1
+concurrency: 2
+stream: true
+tags:
+  - agent
+  - tools
+  - mcp
+  - benchmark-bridge
+requests:
+  - name: planner-turn
+    session_id: agent-session-1
+    max_tokens: 220
+    messages:
+      - role: system
+        content: You are an MCP-oriented coding agent. Call tools when required and keep reasoning concise.
+      - role: user
+        content: Search the repository for the cache regression path and decide the next tool call.
+    tools:
+      - type: function
+        function:
+          name: search_code
+          description: Search the repository for structural patterns.
+          parameters:
+            type: object
+            properties:
+              pattern:
+                type: string
+              directory:
+                type: string
+            required:
+              - pattern
+              - directory
+    tool_choice: auto
+  - name: executor-turn
+    session_id: agent-session-1
+    max_tokens: 256
+    messages:
+      - role: system
+        content: You are an MCP-oriented coding agent. Call tools when required and keep reasoning concise.
+      - role: user
+        content: Search the repository for the cache regression path and decide the next tool call.
+      - role: assistant
+        content: '{"tool_calls": [{"id": "call_1", "type": "function", "function": {"name": "search_code", "arguments": "{\"pattern\": \"kv_cache\", \"directory\": \"/workspace\"}"}}]}'
+      - role: tool
+        tool_call_id: call_1
+        content: '[{"file": "src/cache.py", "line": 41, "match": "kv_cache.allocate(seq_id)"}]'
+      - role: user
+        content: The tool found the regression path. Decide the next patch or validation step.
+    tools:
+      - type: function
+        function:
+          name: apply_patch
+          description: Apply a patch to the repository.
+          parameters:
+            type: object
+            properties:
+              patch:
+                type: string
+            required:
+              - patch
+    tool_choice: auto

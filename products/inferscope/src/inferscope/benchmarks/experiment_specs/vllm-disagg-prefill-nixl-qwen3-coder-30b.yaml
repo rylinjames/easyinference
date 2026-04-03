@@ -1,0 +1,38 @@
+version: "1"
+name: vllm-disagg-prefill-nixl-qwen3-coder-30b
+description: vLLM prefill/decode split with NIXL KV transfer (RDMA/NVLink) for Qwen3-Coder-30B.
+engine: vllm
+workload: qwen3-coder-kv-stress
+benchmark_role: topology_probe
+model: Qwen3-Coder-30B-A3B-Instruct
+target_gpu_families: [hopper, blackwell, blackwell_ultra, blackwell_grace, blackwell_ultra_grace]
+target_model_classes: [classical_moe]
+focus_areas: [disaggregation, kv_transfer, rdma, long_context]
+topology:
+  mode: prefill_decode_split
+  session_routing: sticky
+  session_header_name: X-Session-ID
+  request_target_name: primary
+  kv_connector: NixlConnector
+cache:
+  strategy: nixl
+  tiers: [gpu_hbm]
+  connector: NixlConnector
+  session_affinity: true
+  prefix_cache_expected: true
+metrics_targets:
+  - name: primary
+    role: primary
+    endpoint_source: metrics_endpoint
+    expected_engine: vllm
+  - name: prefill
+    role: prefill
+    endpoint_source: named_override
+    override_key: prefill
+    expected_engine: vllm
+  - name: decode
+    role: decode
+    endpoint_source: named_override
+    override_key: decode
+    expected_engine: vllm
+tags: [vllm, disagg, nixl, rdma, qwen3-coder]

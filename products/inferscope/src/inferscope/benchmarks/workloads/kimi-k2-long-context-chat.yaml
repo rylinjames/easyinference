@@ -1,0 +1,90 @@
+version: "1"
+name: kimi-k2-long-context-chat
+description: Long-context chat workload for Kimi-K2.5 using ShareGPT conversations prepended with CodeSearchNet code context for realistic technical discussions.
+workload_class: chat
+benchmark_role: production
+target_gpu_families: [hopper, blackwell, blackwell_ultra]
+target_model_classes: [classical_moe]
+focus_areas: [long_context, chat, multi_turn, prefix_cache, lmcache, reliability, observability]
+model: Kimi-K2.5
+concurrency: 8
+stream: true
+tags:
+  - kimi
+  - dynamo
+  - chat
+  - long-context
+  - production
+  - multi-turn
+  - dataset:ShareGPT_V3
+requests:
+  - name: technical-discussion-turn1
+    session_id: chat-session-a
+    max_tokens: 512
+    metadata:
+      approx_context_tokens: 32768
+      turn: 0
+    messages:
+      - role: system
+        content: |
+          You are a knowledgeable technical assistant. The user is discussing code and architecture.
+          You have access to the following repository context for reference.
+
+          # Repository context
+          services/gateway/router.py: request routing and admission control
+          services/runtime/worker.py: long-context generation and cache plumbing
+          services/runtime/kv_router.py: cache-aware worker selection
+          observability/prometheus.py: metric export and label hygiene
+          lib/attention/flash_attn.py: flash attention implementation
+          lib/cache/block_manager.py: KV cache block allocation and eviction
+      - role: user
+        content: |
+          I'm trying to understand how KV cache eviction interacts with prefix caching
+          in a disaggregated serving setup. When the prefill worker completes and transfers
+          KV to the decode worker, what happens to the prefix cache blocks on the prefill side?
+          Are they kept for future requests or evicted immediately?
+  - name: technical-discussion-turn2
+    session_id: chat-session-a
+    max_tokens: 640
+    metadata:
+      approx_context_tokens: 32768
+      turn: 1
+    messages:
+      - role: system
+        content: |
+          You are a knowledgeable technical assistant discussing code and architecture.
+      - role: user
+        content: |
+          I'm trying to understand how KV cache eviction interacts with prefix caching
+          in a disaggregated serving setup.
+      - role: assistant
+        content: In a disaggregated setup with NIXL transfer, the prefill worker typically keeps prefix cache blocks after transfer because future requests from the same session will likely share the same prefix.
+      - role: user
+        content: |
+          That makes sense. But what about memory pressure? If the prefill worker is handling
+          many concurrent sessions and HBM fills up, how should it decide which prefix blocks
+          to evict? LRU seems wrong here because a coding session prefix that hasn't been
+          accessed in 30 seconds might still be highly valuable.
+  - name: architecture-review
+    session_id: chat-session-b
+    max_tokens: 512
+    metadata:
+      approx_context_tokens: 65536
+      turn: 0
+    messages:
+      - role: system
+        content: |
+          You are a senior inference engineer reviewing system architecture.
+          Provide specific, actionable feedback grounded in GPU memory constraints and serving latency.
+
+          # Deployment context
+          Model: Kimi-K2.5 (400B MoE, 128 experts, GQA)
+          GPU: 8x H200 SXM (141GB HBM3e each)
+          Topology: Dynamo disaggregated (4 prefill + 4 decode)
+          Cache: LMCache shared mode with NIXL transfer
+          Workload: Long-context coding (32K-128K context)
+      - role: user
+        content: |
+          We're seeing TTFT spikes when KV cache utilization exceeds 85% on the prefill workers.
+          The decode workers are fine. What's the likely root cause and what should we change
+          in the Dynamo config?

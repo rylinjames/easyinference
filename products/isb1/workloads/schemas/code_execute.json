@@ -1,0 +1,27 @@
+{
+  "type": "function",
+  "function": {
+    "name": "code_execute",
+    "description": "Execute a code snippet in a sandboxed environment and return the output.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "language": {
+          "type": "string",
+          "enum": ["python", "javascript", "bash", "rust"],
+          "description": "Programming language of the code"
+        },
+        "code": {
+          "type": "string",
+          "description": "The code to execute"
+        },
+        "timeout_seconds": {
+          "type": "integer",
+          "description": "Maximum execution time",
+          "default": 30
+        }
+      },
+      "required": ["language", "code"]
+    }
+  }
+}

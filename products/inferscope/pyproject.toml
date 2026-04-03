@@ -1,0 +1,95 @@
+[project]
+name = "inferscope"
+version = "0.1.0"
+description = "Hardware-aware inference optimization for LLM serving engines"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11"
+dependencies = [
+    "aiohttp>=3.12.12",
+    "fastmcp==3.1.0",
+    "httpx>=0.28.1",
+    "prometheus-client>=0.22.1",
+    "pydantic>=2.11.7",
+    "pyyaml>=6.0.2",
+    "rich>=14.0.0",
+    "structlog>=25.5.0",
+    "typer>=0.16.0",
+]
+
+[project.scripts]
+inferscope = "inferscope.cli:app"
+
+[dependency-groups]
+dev = [
+    "bandit>=1.8.3",
+    "mypy>=1.16.1",
+    "pytest>=9.0.2",
+    "pytest-asyncio>=1.3.0",
+    "ruff>=0.15.7",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/inferscope"]
+include = [
+    "src/inferscope/benchmarks/workloads/*.yaml",
+    "src/inferscope/benchmarks/experiment_specs/*.yaml",
+]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "src/inferscope/**/*.py",
+    "src/inferscope/benchmarks/workloads/*.yaml",
+    "src/inferscope/benchmarks/experiment_specs/*.yaml",
+    "README.md",
+    "ARCHITECTURE.md",
+    "CONTRIBUTING.md",
+    "SECURITY.md",
+    "VALIDATION.md",
+    "docs/**/*.md",
+]
+exclude = [
+    ".venv",
+    ".venv*",
+    "dist",
+    "__pycache__",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP", "S", "B", "A", "SIM", "PIE"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]
+
+[tool.bandit]
+exclude_dirs = ["tests"]
+skips = ["B101"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+markers = [
+    "integration: broader cross-module integration coverage",
+    "live_engine: requires a real running inference endpoint and metrics surface",
+]
+
+[tool.uv]
+package = true
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+check_untyped_defs = true

@@ -1,0 +1,16 @@
+mode: mode_a
+description: "Mode A (vLLM defaults) \u2014 Llama-3.3-70B on H100-SXM-80GB at fp8"
+gpu: h100
+gpu_name: H100-SXM-80GB
+model: llama70b
+model_name: Llama-3.3-70B
+hf_model_id: meta-llama/Llama-3.3-70B-Instruct
+quantization: fp8
+tensor_parallel_size: 1
+gpu_memory_utilization: 0.9
+max_num_seqs: 256
+max_model_len: 32768
+trust_remote_code: false
+tokenizer_mode: auto
+kv_cache_dtype: fp8_e5m2
+dtype: auto

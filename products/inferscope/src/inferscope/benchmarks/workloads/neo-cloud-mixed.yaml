@@ -1,0 +1,40 @@
+version: "1"
+name: neo-cloud-mixed
+description: Mixed-tenant managed inference workload with bursty traffic and varied sessions.
+workload_class: neo_cloud
+benchmark_role: operator_extension
+target_gpu_families: [ampere, hopper, hopper_grace, blackwell, blackwell_ultra, blackwell_grace, blackwell_ultra_grace, cdna3, cdna4]
+target_model_classes: [dense_gqa, qwen35_hybrid, compact_agentic_moe, frontier_mla_moe]
+focus_areas: [multi_tenant, burstiness, session_isolation]
+model: Qwen3.5-32B
+concurrency: 4
+stream: true
+tags:
+  - neocloud
+  - mixed-tenant
+  - session-isolation
+requests:
+  - name: chat-tenant-a
+    session_id: tenant-a-session-1
+    max_tokens: 160
+    messages:
+      - role: system
+        content: You are a concise assistant.
+      - role: user
+        content: Summarize the retrieved customer support context and draft a reply.
+  - name: coding-tenant-b
+    session_id: tenant-b-session-8
+    max_tokens: 240
+    messages:
+      - role: system
+        content: You are a coding assistant.
+      - role: user
+        content: Explain the likely cause of a cache miss regression in a replay harness.
+  - name: rag-tenant-c
+    session_id: tenant-c-session-2
+    max_tokens: 180
+    messages:
+      - role: system
+        content: You are a concise assistant.
+      - role: user
+        content: Answer the question using the retrieved enterprise policy context.

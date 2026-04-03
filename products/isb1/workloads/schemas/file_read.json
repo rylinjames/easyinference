@@ -1,0 +1,25 @@
+{
+  "type": "function",
+  "function": {
+    "name": "file_read",
+    "description": "Read the contents of a file from the repository.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Path to the file relative to repository root"
+        },
+        "start_line": {
+          "type": "integer",
+          "description": "First line to read (1-indexed, optional)"
+        },
+        "end_line": {
+          "type": "integer",
+          "description": "Last line to read (inclusive, optional)"
+        }
+      },
+      "required": ["path"]
+    }
+  }
+}

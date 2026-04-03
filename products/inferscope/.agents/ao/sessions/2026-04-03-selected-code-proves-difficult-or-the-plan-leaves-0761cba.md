@@ -1,0 +1,101 @@
+---
+session_id: 0761cba6-9583-4794-a092-26565aec2bf7
+date: 2026-04-03
+summary: "selected code proves difficult or the plan leaves a concrete gap.
+
+## The Workflow
+
+1. **Quick sc..."
+tags:
+  - olympus
+  - session
+  - 2026-04
+---
+
+# selected code proves difficult or the plan leaves a concrete gap.
+
+## The Workflow
+
+1. **Quick sc...
+
+**Session:** 0761cba6-9583-4794-a092-26565aec2bf7
+**Date:** 2026-04-03
+
+## Decisions
+- selected code proves difficult or the plan leaves a concrete gap.
+
+## The Workflow
+
+1. **Quick scan** – Understand how the task relates to the codebase
+2. **Context builder** – Call...
+
+## Knowledge
+- til you have:
+1. Completed Phase 1 (Quick Scan)
+2. **Called `context_builder`** and received its plan
+
+Skipping `context_builder` results in shallow implementations that miss architectural patterns,...
+- till passes completely (we saw 42/42 above) and do a quick lint:
+
+## Files Changed
+- `EasyInference`
+- `inferencebreakpoints`
+- `EasyInference/CLAUDE.md`
+- `EasyInference/ARCHITECTURE.md`
+- `EasyInference/products/inferscope/ARCHITECTURE.md`
+- `EasyInference/products/inferscope/src/inferscope/optimization/checks.py`
+- `EasyInference/products/inferscope/src/inferscope/optimization/recommender.py`
+- `EasyInference/products/inferscope/src/inferscope/tools/diagnose.py`
+- `EasyInference/products/inferscope/src/inferscope/tools/kv_cache.py`
+- `inferencebreakpoints/07-kv-cache/compression/kv-cache-quantization/analysis.md`
+- `inferencebreakpoints/08-decode/batch-effects/dynamic-batch-splitting/analysis.md`
+- `inferencebreakpoints/03-scheduler/iteration-level/iteration-vs-request-granularity/analysis.md`
+- `inferencebreakpoints/06-prefill/ttft-analysis/ttft-decomposition/analysis.md`
+- `inferencebreakpoints/07-kv-cache/disaggregated-kv/cache-hit-vs-recompute-decision/analysis.md`
+- `inferencebreakpoints/06-prefill/ttft-analysis/ttft-slo-tiers/analysis.md`
+- `inferencebreakpoints/11-observability/metrics/goodput/analysis.md`
+- `inferencebreakpoints/09-optimizations/quantization/fp8/analysis.md`
+- `inferencebreakpoints/03-scheduler/prefix-aware-scheduling/prefix-vs-latency-tradeoff/analysis.md`
+- `inferencebreakpoints/12-agentic-inference/session-management/session-checkpointing/analysis.md`
+- `inferencebreakpoints/07-kv-cache/offloading/cpu-gpu-memory-sharing/analysis.md`
+- `inferencebreakpoints/05-cold-start/caching/tiered-caching/analysis.md`
+- `inferencebreakpoints/08-decode/batch-effects/batch-size-vs-itl/analysis.md`
+- `inferencebreakpoints/06-prefill/prompt-caching/cache-aware-routing/analysis.md`
+- `inferscope/docs/mirothinker_v1.7_2026-03-28/04_tool_system_v1.7_2026-03-28.md`
+- `inferscope/docs/mirothinker_v1.7_2026-03-28/06_trace_collection_v1.7_2026-03-28.md`
+- `EasyInference/products/inferscope/src/inferscope/profiling/runtime.py`
+- `EasyInference/products/inferscope/src/inferscope/telemetry/normalizer.py`
+- `inferencebreakpoints/05-cold-start/warmup/cuda-graph-capture/analysis.md`
+- `inferencebreakpoints/11-observability/metrics/throughput/analysis.md`
+- `EasyInference/products/isb1/analysis/metrics.py`
+- `EasyInference/products/isb1/harness/telemetry.py`
+- `EasyInference/products/isb1/workloads/agent.py`
+- `EasyInference/products/isb1/configs/workloads/agent.yaml`
+- `EasyInference/products/isb1/configs/workloads/deep_research_agent.yaml`
+- `EasyInference/products/isb1/workloads/deep_research_agent.py`
+
+## Issues
+- `per-dollar`
+- `kv-cache`
+- `vs-itl`
+- `slo-tiers`
+
+## Tool Usage
+
+| Tool | Count |
+|------|-------|
+| Bash | 11 |
+| ToolSearch | 5 |
+| mcp__RepoPrompt__apply_edits | 8 |
+| mcp__RepoPrompt__context_builder | 1 |
+| mcp__RepoPrompt__file_actions | 2 |
+| mcp__RepoPrompt__file_search | 2 |
+| mcp__RepoPrompt__get_file_tree | 3 |
+| mcp__RepoPrompt__read_file | 33 |
+| mcp__RepoPrompt__set_status | 1 |
+
+## Tokens
+
+- **Input:** 0
+- **Output:** 0
+- **Total:** ~242647 (estimated)

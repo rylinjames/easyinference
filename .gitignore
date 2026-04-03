@@ -1,0 +1,77 @@
+# =========================
+# Python / build artifacts
+# =========================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+build/
+dist/
+*.whl
+sdist/
+
+# =========================
+# Virtual environments
+# =========================
+.venv/
+.venv*/
+venv/
+ENV/
+env/
+inferscope.venv.bak.*/
+
+# =========================
+# Testing / coverage / type checking
+# =========================
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# =========================
+# IDE / editor / OS noise
+# =========================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# =========================
+# Secrets / local env
+# =========================
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.cert
+*.p12
+credentials.json
+secrets.yaml
+secrets.yml
+*.secret
+
+# =========================
+# Logs / runtime state
+# =========================
+*.log
+logs/
+*.pid
+
+# =========================
+# Benchmark-generated artifacts
+# =========================
+products/isb1/traces/
+
+# =========================
+# InferScope runtime state
+# =========================
+.inferscope/
+profiles.db
+profiles.sqlite

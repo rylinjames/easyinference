@@ -1,0 +1,39 @@
+version: "1"
+name: dynamo-aggregated-lmcache-kimi-k2-swebench
+description: Aggregated Dynamo serving for Kimi-K2.5 with LMCache, benchmarked using real SWE-bench_Verified coding tasks with CodeSearchNet context padding.
+engine: dynamo
+workload: kimi-k2-swebench-coding
+benchmark_role: production
+model: Kimi-K2.5
+target_gpu_families: [hopper, blackwell, blackwell_ultra]
+target_model_classes: [classical_moe]
+focus_areas: [aggregated, lmcache, long_context, coding, swebench, prefix_cache, reliability, observability]
+topology:
+  mode: single_endpoint
+  session_routing: sticky
+  session_header_name: X-Session-ID
+  request_target_name: primary
+  notes:
+    - SWE-bench instances from the same repo share a session_id for prefix reuse.
+    - Scrape frontend and worker metrics separately to observe prefix cache effectiveness under real coding tasks.
+cache:
+  strategy: lmcache
+  tiers: [gpu_hbm, remote_cache]
+  connector: LMCacheConnectorV1
+  session_affinity: true
+  prefix_cache_expected: true
+  notes:
+    - Prefix reuse across SWE-bench instances from the same repo validates real-world cache effectiveness.
+    - Monitor prefix_cache_hit_rate closely — diverse repos will have lower reuse than synthetic workloads.
+metrics_targets:
+  - name: primary
+    role: primary
+    endpoint_source: named_override
+    override_key: frontend
+    expected_engine: dynamo
+  - name: worker
+    role: other
+    endpoint_source: named_override
+    override_key: worker
+    expected_engine: dynamo
+tags: [dynamo, aggregated, lmcache, kimi, coding, swebench, production]

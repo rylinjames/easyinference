@@ -1,0 +1,185 @@
+name: InferScope CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: products/inferscope
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "latest"
+      - run: uv sync --dev
+      - name: Ruff lint
+        run: uv run ruff check src/ tests/
+      - name: Ruff format check
+        run: uv run ruff format --check src/ tests/
+
+  typecheck:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: products/inferscope
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "latest"
+      - run: uv sync --dev
+      - name: mypy
+        run: uv run mypy src/inferscope/
+
+  security:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: products/inferscope
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "latest"
+      - run: uv sync --dev
+      - name: Bandit security scan
+        run: uv run bandit -r src/inferscope/ -c pyproject.toml -f json -o bandit-report.json || true
+      - name: Check for high-severity findings
+        run: uv run bandit -r src/inferscope/ -c pyproject.toml -ll
+      - name: Upload bandit report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bandit-report
+          path: products/inferscope/bandit-report.json
+
+  package-smoke:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: products/inferscope
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "latest"
+      - run: uv python install 3.12
+      - run: uv build
+      - run: uv venv .venv-smoke --python 3.12
+      - name: Install built wheel
+        run: uv pip install --python .venv-smoke/bin/python dist/*.whl
+      - name: Smoke packaged benchmark resources
+        run: |
+          .venv-smoke/bin/inferscope benchmark-workloads
+          .venv-smoke/bin/inferscope benchmark-experiments
+          .venv-smoke/bin/python - <<'PY'
+          from inferscope.benchmarks import (
+              ProceduralWorkloadOptions,
+              load_experiment,
+              load_workload,
+              materialize_workload,
+          )
+
+          assert load_workload('coding-long-context').name == 'coding-long-context'
+          assert load_experiment('vllm-single-endpoint-baseline').name == 'vllm-single-endpoint-baseline'
+          assert load_workload('benchmarks/workloads/coding-long-context.yaml').name == 'coding-long-context'
+          assert (
+              load_experiment('benchmarks/experiment_specs/vllm-single-endpoint-baseline.yaml').name
+              == 'vllm-single-endpoint-baseline'
+          )
+          assert len(
+              materialize_workload(
+                  'tool-agent',
+                  options=ProceduralWorkloadOptions(
+                      request_count=4,
+                      input_tokens=2048,
+                      output_tokens=256,
+                      seed=7,
+                  ),
+              ).requests
+          ) == 4
+          assert len(
+              materialize_workload(
+                  'coding-long-context',
+                  options=ProceduralWorkloadOptions(
+                      request_count=3,
+                      input_tokens=16384,
+                      output_tokens=512,
+                      seed=11,
+                  ),
+              ).requests
+          ) == 3
+          PY
+
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    defaults:
+      run:
+        working-directory: products/inferscope
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "latest"
+      - run: uv python install ${{ matrix.python-version }}
+      - run: uv sync --dev --python ${{ matrix.python-version }}
+      - name: Install package (editable)
+        run: uv pip install -e .
+      - name: Run tests
+        run: uv run pytest tests/ -v --tb=short
+
+  live-integration:
+    runs-on: ubuntu-latest
+    env:
+      INFERSCOPE_RUN_LIVE_TESTS: "1"
+      INFERSCOPE_LIVE_VLLM_ENDPOINT: ${{ secrets.INFERSCOPE_LIVE_VLLM_ENDPOINT }}
+      INFERSCOPE_LIVE_VLLM_METRICS_ENDPOINT: ${{ secrets.INFERSCOPE_LIVE_VLLM_METRICS_ENDPOINT }}
+      INFERSCOPE_LIVE_VLLM_MODEL: ${{ secrets.INFERSCOPE_LIVE_VLLM_MODEL }}
+      INFERSCOPE_LIVE_VLLM_GPU_NAME: ${{ secrets.INFERSCOPE_LIVE_VLLM_GPU_NAME }}
+      INFERSCOPE_LIVE_VLLM_GPU_ARCH: ${{ secrets.INFERSCOPE_LIVE_VLLM_GPU_ARCH }}
+      INFERSCOPE_LIVE_VLLM_QUANTIZATION: ${{ secrets.INFERSCOPE_LIVE_VLLM_QUANTIZATION }}
+      INFERSCOPE_LIVE_VLLM_KV_CACHE_DTYPE: ${{ secrets.INFERSCOPE_LIVE_VLLM_KV_CACHE_DTYPE }}
+      INFERSCOPE_LIVE_VLLM_API_KEY: ${{ secrets.INFERSCOPE_LIVE_VLLM_API_KEY }}
+      INFERSCOPE_LIVE_SGLANG_ENDPOINT: ${{ secrets.INFERSCOPE_LIVE_SGLANG_ENDPOINT }}
+      INFERSCOPE_LIVE_SGLANG_METRICS_ENDPOINT: ${{ secrets.INFERSCOPE_LIVE_SGLANG_METRICS_ENDPOINT }}
+      INFERSCOPE_LIVE_SGLANG_MODEL: ${{ secrets.INFERSCOPE_LIVE_SGLANG_MODEL }}
+      INFERSCOPE_LIVE_SGLANG_GPU_NAME: ${{ secrets.INFERSCOPE_LIVE_SGLANG_GPU_NAME }}
+      INFERSCOPE_LIVE_SGLANG_GPU_ARCH: ${{ secrets.INFERSCOPE_LIVE_SGLANG_GPU_ARCH }}
+      INFERSCOPE_LIVE_SGLANG_QUANTIZATION: ${{ secrets.INFERSCOPE_LIVE_SGLANG_QUANTIZATION }}
+      INFERSCOPE_LIVE_SGLANG_KV_CACHE_DTYPE: ${{ secrets.INFERSCOPE_LIVE_SGLANG_KV_CACHE_DTYPE }}
+      INFERSCOPE_LIVE_SGLANG_API_KEY: ${{ secrets.INFERSCOPE_LIVE_SGLANG_API_KEY }}
+    defaults:
+      run:
+        working-directory: products/inferscope
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "latest"
+      - run: uv python install 3.12
+      - run: uv sync --dev --python 3.12
+      - name: Install package (editable)
+        run: uv pip install -e .
+      - name: Run live integration tests when configured
+        run: |
+          if [ ! -f tests/integration/test_live_engines.py ]; then
+            echo "Skipping live integration tests — tests/integration/test_live_engines.py is absent"
+            exit 0
+          fi
+          if [ -z "${INFERSCOPE_LIVE_VLLM_ENDPOINT}${INFERSCOPE_LIVE_SGLANG_ENDPOINT}" ]; then
+            echo "Skipping live integration tests — no live endpoints configured"
+            exit 0
+          fi
+          uv run pytest tests/integration/test_live_engines.py -v -m live_engine --tb=short

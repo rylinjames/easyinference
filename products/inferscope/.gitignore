@@ -1,0 +1,77 @@
+# =========================
+# Python
+# =========================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+*.whl
+sdist/
+
+# =========================
+# Virtual environments
+# =========================
+.venv/
+.venv*/
+venv/
+ENV/
+env/
+
+# =========================
+# uv
+# =========================
+# Keep uv.lock in VCS for reproducible builds
+# uv.lock
+
+# =========================
+# Testing / Coverage
+# =========================
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# =========================
+# IDE / Editor
+# =========================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# =========================
+# Security — NEVER commit these
+# =========================
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.cert
+*.p12
+credentials.json
+secrets.yaml
+secrets.yml
+*.secret
+
+# =========================
+# Runtime / Logs
+# =========================
+*.log
+logs/
+*.pid
+
+# =========================
+# InferScope-specific
+# =========================
+.inferscope/
+profiles.db
+profiles.sqlite

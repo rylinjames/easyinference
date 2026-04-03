@@ -1,0 +1,30 @@
+{
+  "type": "function",
+  "function": {
+    "name": "api_call",
+    "description": "Make an HTTP request to an external API endpoint.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "method": {
+          "type": "string",
+          "enum": ["GET", "POST", "PUT", "DELETE"],
+          "description": "HTTP method"
+        },
+        "url": {
+          "type": "string",
+          "description": "Full URL to call"
+        },
+        "headers": {
+          "type": "object",
+          "description": "HTTP headers as key-value pairs"
+        },
+        "body": {
+          "type": "string",
+          "description": "Request body (for POST/PUT)"
+        }
+      },
+      "required": ["method", "url"]
+    }
+  }
+}

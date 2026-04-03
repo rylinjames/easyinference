@@ -1,0 +1,41 @@
+sweep_name: "core"
+description: "ISB-1 Core Benchmark — Required for publication"
+
+gpus: ["h100", "h200", "b200"]
+
+models:
+  - model: "dsr1"
+    architecture_class: "frontier_mla_moe"
+  - model: "qwen235b"
+    architecture_class: "hybrid_moe"
+  - model: "llama70b"
+    architecture_class: "dense_gqa"
+
+workloads: ["chat", "agent", "rag", "coding"]
+
+modes: ["mode_a", "mode_b"]
+
+quantizations:
+  default: ["fp8"]
+  bf16_reference: true
+  nvfp4:
+    - gpu: "b200"
+      model: "dsr1"
+
+trials:
+  default: 3
+  high_variance_max: 5
+  bf16_reference: 1
+
+measurement:
+  warmup_requests: 100
+  warmup_seconds: 60
+  warmup_max_extensions: 3
+  steady_state_variance_threshold: 0.20
+  measurement_duration_seconds: 600
+  cooldown_seconds: 30
+
+variance:
+  cv_threshold: 0.10
+  extended_trials: 5
+  high_variance_flag: true

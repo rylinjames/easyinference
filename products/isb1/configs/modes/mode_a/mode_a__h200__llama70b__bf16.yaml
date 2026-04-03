@@ -1,0 +1,16 @@
+mode: mode_a
+description: "Mode A (vLLM defaults) \u2014 Llama-3.3-70B on H200-SXM-141GB at bf16"
+gpu: h200
+gpu_name: H200-SXM-141GB
+model: llama70b
+model_name: Llama-3.3-70B
+hf_model_id: meta-llama/Llama-3.3-70B-Instruct
+quantization: bf16
+tensor_parallel_size: 1
+gpu_memory_utilization: 0.9
+max_num_seqs: 256
+max_model_len: 32768
+trust_remote_code: false
+tokenizer_mode: auto
+kv_cache_dtype: auto
+dtype: bf16

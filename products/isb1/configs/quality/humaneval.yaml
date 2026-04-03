@@ -1,0 +1,16 @@
+quality_eval: "humaneval"
+description: "HumanEval pass@1 code generation benchmark"
+
+metric: "pass@1"
+num_samples: 1
+temperature: 0.0
+max_tokens: 512
+
+dataset: "openai/humaneval"
+num_problems: 164
+
+quality_gates:
+  pass_at_1_delta:
+    pass: -0.02        # >= -2.0% delta vs BF16
+    marginal: -0.05    # >= -5.0% delta vs BF16
+    fail: -0.05        # < -5.0% delta vs BF16

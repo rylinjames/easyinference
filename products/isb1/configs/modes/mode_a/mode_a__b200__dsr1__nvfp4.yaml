@@ -1,0 +1,16 @@
+mode: mode_a
+description: "Mode A (vLLM defaults) \u2014 DeepSeek-R1 on B200-192GB at nvfp4"
+gpu: b200
+gpu_name: B200-192GB
+model: dsr1
+model_name: DeepSeek-R1
+hf_model_id: deepseek-ai/DeepSeek-R1
+quantization: nvfp4
+tensor_parallel_size: 4
+gpu_memory_utilization: 0.9
+max_num_seqs: 256
+max_model_len: 32768
+trust_remote_code: true
+tokenizer_mode: auto
+kv_cache_dtype: auto
+dtype: auto

@@ -1,0 +1,28 @@
+mode: mode_b
+description: Mode B (InferScope-optimized) — Qwen3.5-235B-A22B on B200-192GB (baseline
+  bf16 -> optimized fp8)
+baseline_quantization: bf16
+gpu: b200
+gpu_name: B200-192GB
+model: qwen235b
+model_name: Qwen3.5-235B-A22B
+hf_model_id: Qwen/Qwen3.5-235B-A22B
+quantization: fp8
+tensor_parallel_size: 2
+gpu_memory_utilization: 0.93
+max_num_seqs: 32
+max_num_batched_tokens: 40000
+enable_prefix_caching: true
+enable_chunked_prefill: true
+kv_cache_dtype: fp8_e4m3
+dtype: auto
+engine: vllm
+optimized_by: inferscope
+reasoning_summary:
+- 'HardwareNode: Detected NVIDIA B200 (Blackwell) with 192GB memory.'
+- 'HardwareNode: Blackwell Tier 1 — vLLM for chat (FlashAttention-4 with RoPE+KV fusion,
+  NVFP4 native, nvCOMP decompression engine).'
+- 'HardwareNode: Native FP8 support detected; use FP8 as the default throughput/quality
+  tradeoff.'
+- 'ModelNode: Analyzing Qwen3.5-397B-A17B (397B total, qwen35_hybrid).'
+- 'ModelNode: Resolved routing topology to TP=2, EP=1, DP=1.'

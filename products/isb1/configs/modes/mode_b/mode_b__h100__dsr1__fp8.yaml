@@ -1,0 +1,28 @@
+mode: mode_b
+description: Mode B (InferScope-optimized) — DeepSeek-R1 on H100-SXM-80GB (baseline
+  fp8 -> optimized awq)
+baseline_quantization: fp8
+gpu: h100
+gpu_name: H100-SXM-80GB
+model: dsr1
+model_name: DeepSeek-R1
+hf_model_id: deepseek-ai/DeepSeek-R1
+quantization: awq
+tensor_parallel_size: 8
+gpu_memory_utilization: 0.95
+max_num_seqs: 1024
+max_num_batched_tokens: 16750
+enable_prefix_caching: true
+enable_chunked_prefill: true
+kv_cache_dtype: auto
+dtype: auto
+engine: vllm
+optimized_by: inferscope
+reasoning_summary:
+- 'HardwareNode: Detected NVIDIA H100 SXM (Hopper) with 80GB memory.'
+- 'HardwareNode: Hopper Tier 1 — vLLM for chat (FlashAttention-3 via wgmma/TMA, zero-overhead
+  prefix caching, Hopper-optimized chunked prefill).'
+- 'HardwareNode: Native FP8 would overrun per-GPU HBM at the requested GPU count;
+  falling back to AWQ for a memory-valid auto plan.'
+- 'ModelNode: Analyzing DeepSeek-R1 (671B total, frontier_mla_moe).'
+- 'ModelNode: Resolved routing topology to TP=8, EP=1, DP=1.'

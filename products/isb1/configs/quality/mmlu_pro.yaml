@@ -1,0 +1,16 @@
+quality_eval: "mmlu_pro"
+description: "MMLU-Pro subset for knowledge quality evaluation"
+
+metric: "accuracy"
+num_few_shot: 5
+max_tokens: 256
+
+dataset: "TIGER-Lab/MMLU-Pro"
+subset_size: 500
+seed: 42
+
+quality_gates:
+  accuracy_delta:
+    pass: -0.01
+    marginal: -0.03
+    fail: -0.03

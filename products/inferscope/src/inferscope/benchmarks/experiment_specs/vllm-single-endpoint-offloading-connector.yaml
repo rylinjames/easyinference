@@ -1,0 +1,29 @@
+version: "1"
+name: vllm-single-endpoint-offloading-connector
+description: Single-endpoint vLLM benchmark with explicit OffloadingConnector KV spill for realistic cold-session overflow tests.
+engine: vllm
+workload: long-context-kv-offload-rag
+benchmark_role: topology_probe
+target_gpu_families: [hopper, hopper_grace, blackwell, blackwell_ultra, blackwell_grace, blackwell_ultra_grace]
+target_model_classes: [dense_gqa, qwen35_hybrid, frontier_mla_moe]
+focus_areas: [kv_offload, long_context, cold_session, host_overflow]
+topology:
+  mode: single_endpoint
+  session_routing: sticky
+  session_header_name: X-Session-ID
+  request_target_name: primary
+cache:
+  strategy: offloading_connector
+  tiers: [gpu_hbm, cpu_dram]
+  connector: OffloadingConnector
+  session_affinity: true
+  prefix_cache_expected: true
+  notes:
+    - Model cold/idle KV spill explicitly; do not treat this as active decode offload.
+    - Use this lane to compare GPU-resident baseline vs host-DRAM overflow behavior.
+metrics_targets:
+  - name: primary
+    role: primary
+    endpoint_source: metrics_endpoint
+    expected_engine: vllm
+tags: [vllm, single-endpoint, offloading-connector, long-context, kv-offload]

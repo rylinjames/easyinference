@@ -1,0 +1,26 @@
+version: "1"
+name: sglang-single-endpoint-hicache
+description: Single-endpoint SGLang benchmark with HiCache tiers enabled.
+engine: sglang
+workload: tool-agent
+benchmark_role: operator_extension
+target_gpu_families: [hopper, hopper_grace, blackwell, blackwell_ultra, blackwell_grace, blackwell_ultra_grace, cdna3, cdna4]
+target_model_classes: [frontier_mla_moe, compact_agentic_moe, qwen35_hybrid]
+focus_areas: [tool_calling, hicache, session_reuse]
+topology:
+  mode: single_endpoint
+  session_routing: sticky
+  session_header_name: X-Session-ID
+  request_target_name: primary
+cache:
+  strategy: hicache
+  tiers: [gpu_hbm, cpu_dram, local_ssd]
+  connector: HiCache
+  session_affinity: true
+  prefix_cache_expected: true
+metrics_targets:
+  - name: primary
+    role: primary
+    endpoint_source: metrics_endpoint
+    expected_engine: sglang
+tags: [sglang, hicache, single-endpoint]

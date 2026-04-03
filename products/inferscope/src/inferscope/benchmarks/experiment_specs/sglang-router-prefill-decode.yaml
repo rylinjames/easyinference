@@ -1,0 +1,39 @@
+version: "1"
+name: sglang-router-prefill-decode
+description: Routed SGLang benchmark with separate router, prefill, and decode metrics targets.
+engine: sglang
+workload: tool-agent
+benchmark_role: topology_probe
+target_gpu_families: [hopper, hopper_grace, blackwell, blackwell_ultra, blackwell_grace, blackwell_ultra_grace, cdna3, cdna4]
+target_model_classes: [frontier_mla_moe, compact_agentic_moe, qwen35_hybrid]
+focus_areas: [tool_calling, disaggregation, router, hicache]
+topology:
+  mode: router_prefill_decode
+  session_routing: sticky
+  session_header_name: X-Session-ID
+  request_target_name: primary
+cache:
+  strategy: hicache
+  tiers: [gpu_hbm, cpu_dram, local_ssd]
+  connector: HiCache
+  session_affinity: true
+  prefix_cache_expected: true
+metrics_targets:
+  - name: primary
+    role: primary
+    endpoint_source: metrics_endpoint
+  - name: router
+    role: router
+    endpoint_source: named_override
+    override_key: router
+  - name: prefill
+    role: prefill
+    endpoint_source: named_override
+    override_key: prefill
+    expected_engine: sglang
+  - name: decode
+    role: decode
+    endpoint_source: named_override
+    override_key: decode
+    expected_engine: sglang
+tags: [sglang, router, disagg, hicache]

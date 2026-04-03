@@ -1,0 +1,28 @@
+mode: mode_b
+description: Mode B (InferScope-optimized) — Llama-3.3-70B on H100-SXM-80GB (baseline
+  bf16 -> optimized fp8)
+baseline_quantization: bf16
+gpu: h100
+gpu_name: H100-SXM-80GB
+model: llama70b
+model_name: Llama-3.3-70B
+hf_model_id: meta-llama/Llama-3.3-70B-Instruct
+quantization: fp8
+tensor_parallel_size: 2
+gpu_memory_utilization: 0.95
+max_num_seqs: 174
+max_num_batched_tokens: 16750
+enable_prefix_caching: true
+enable_chunked_prefill: true
+kv_cache_dtype: fp8_e4m3
+dtype: auto
+engine: vllm
+optimized_by: inferscope
+reasoning_summary:
+- 'HardwareNode: Detected NVIDIA H100 SXM (Hopper) with 80GB memory.'
+- 'HardwareNode: Hopper Tier 1 — vLLM for chat (FlashAttention-3 via wgmma/TMA, zero-overhead
+  prefix caching, Hopper-optimized chunked prefill).'
+- 'HardwareNode: Native FP8 support detected; use FP8 as the default throughput/quality
+  tradeoff.'
+- 'ModelNode: Analyzing Llama-3-70B (70B total, dense_gqa).'
+- 'ModelNode: Using model-specific H100 FP8 tensor-parallel hint.'

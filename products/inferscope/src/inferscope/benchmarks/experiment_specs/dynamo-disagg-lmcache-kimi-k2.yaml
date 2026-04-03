@@ -1,0 +1,44 @@
+version: "1"
+name: dynamo-disagg-lmcache-kimi-k2
+description: Disaggregated Dynamo serving for Kimi-K2.5 with LMCache, KV-aware routing, and separate prefill/decode observability.
+engine: dynamo
+workload: kimi-k2-long-context-coding
+benchmark_role: production
+model: Kimi-K2.5
+target_gpu_families: [hopper, blackwell, blackwell_ultra]
+target_model_classes: [classical_moe]
+focus_areas: [disaggregation, lmcache, long_context, coding, reliability, observability]
+topology:
+  mode: prefill_decode_split
+  session_routing: sticky
+  session_header_name: X-Session-ID
+  request_target_name: primary
+  kv_connector: LMCacheConnectorV1
+  notes:
+    - Frontend should run in KV-router mode and keep request IDs stable across worker migration.
+    - Prefill and decode workers must expose separate DYN_SYSTEM_PORT values for metrics and health checks.
+cache:
+  strategy: lmcache
+  tiers: [gpu_hbm, cpu_dram, remote_cache]
+  connector: LMCacheConnectorV1
+  session_affinity: true
+  prefix_cache_expected: true
+  notes:
+    - Use this lane to validate split prefill/decode under long-context coding load with cache reuse intact.
+metrics_targets:
+  - name: primary
+    role: primary
+    endpoint_source: named_override
+    override_key: frontend
+    expected_engine: dynamo
+  - name: prefill
+    role: prefill
+    endpoint_source: named_override
+    override_key: prefill
+    expected_engine: dynamo
+  - name: decode
+    role: decode
+    endpoint_source: named_override
+    override_key: decode
+    expected_engine: dynamo
+tags: [dynamo, disagg, lmcache, kimi, coding, production]

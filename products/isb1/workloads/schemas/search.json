@@ -1,0 +1,27 @@
+{
+  "type": "function",
+  "function": {
+    "name": "search",
+    "description": "Search the web or internal knowledge base for information relevant to the user's query.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "The search query to execute"
+        },
+        "source": {
+          "type": "string",
+          "enum": ["web", "internal_docs", "code_search"],
+          "description": "Which search backend to use"
+        },
+        "max_results": {
+          "type": "integer",
+          "description": "Maximum number of results to return",
+          "default": 5
+        }
+      },
+      "required": ["query"]
+    }
+  }
+}

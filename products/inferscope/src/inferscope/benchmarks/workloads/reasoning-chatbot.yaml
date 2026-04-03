@@ -1,0 +1,38 @@
+version: "1"
+name: reasoning-chatbot
+description: Cursor-style chat assistant requiring deep reasoning (Chain-of-Thought) for complex architecture questions.
+workload_class: chat
+benchmark_role: reference
+target_gpu_families: [ampere, hopper, hopper_grace, blackwell, blackwell_ultra, blackwell_grace, blackwell_ultra_grace, cdna3, cdna4]
+target_model_classes: [dense_gqa, frontier_mla_moe, qwen35_hybrid]
+focus_areas: [chat, reasoning, latency]
+model: Llama-3-70B-Chat
+concurrency: 2
+stream: true
+tags:
+  - chat
+  - reasoning
+  - cot
+requests:
+  - name: turn-1-arch
+    session_id: reasoning-session
+    max_tokens: 1500
+    messages:
+      - role: system
+        content: You are a staff-level backend architect. You always think step-by-step and explain performance implications before giving the final answer.
+      - role: user
+        content: |
+          I am designing a distributed key-value cache that spans multiple regions. 
+          It needs to support 10 million QPS with P99 latency under 5ms, but cross-region replication latency is naturally around 40ms.
+          How should I structure the replication topology, consistency model, and client routing to achieve this target?
+          Walk me through your reasoning for each layer.
+  - name: turn-2-followup
+    session_id: reasoning-session
+    max_tokens: 2048
+    messages:
+      - role: system
+        content: You are a staff-level backend architect. You always think step-by-step and explain performance implications before giving the final answer.
+      - role: user
+        content: |
+          Your point about Quorum reads is valid, but how does that interact with the cache invalidation stream from the primary DB?
+          If a write hits Region A, how quickly can we guarantee Region B won't serve stale data, and what is the exact mechanism to enforce that without blowing up our latency budget? Let's use Kafka as the event bus.

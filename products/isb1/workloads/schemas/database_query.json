@@ -1,0 +1,27 @@
+{
+  "type": "function",
+  "function": {
+    "name": "database_query",
+    "description": "Execute a read-only SQL query against the application database.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "SQL query to execute (SELECT only)"
+        },
+        "database": {
+          "type": "string",
+          "enum": ["users", "analytics", "inventory"],
+          "description": "Which database to query"
+        },
+        "limit": {
+          "type": "integer",
+          "description": "Maximum rows to return",
+          "default": 100
+        }
+      },
+      "required": ["query", "database"]
+    }
+  }
+}

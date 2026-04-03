@@ -1,0 +1,13 @@
+gpu_name: "H100-SXM-80GB"
+gpu_short: "h100"
+compute_capability: "sm_90a"
+hbm_capacity_gb: 80
+hbm_bandwidth_tbs: 3.35
+nvlink_generation: 4
+nvlink_bandwidth_gbs: 900
+tdp_watts: 700
+fp8_support: true
+nvfp4_support: false
+fp_formats: ["bf16", "fp16", "fp8_e4m3", "fp8_e5m2"]
+kv_cache_dtypes: ["auto", "fp8_e5m2"]
+max_gpus_per_node: 8

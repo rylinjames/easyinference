@@ -1,0 +1,129 @@
+version: "1"
+name: enterprise-coding-agent
+description: 8-turn tool-calling coding agent workload over a large codebase context for prefix caching.
+workload_class: coding
+benchmark_role: reference
+target_gpu_families: [hopper, hopper_grace, blackwell, blackwell_ultra, blackwell_grace, blackwell_ultra_grace, cdna3, cdna4]
+target_model_classes: [compact_agentic_moe, frontier_mla_moe, qwen35_hybrid]
+focus_areas: [coding_agent, long_context, prefix_cache, tool_calling]
+model: DeepSeek-Coder-V3
+concurrency: 4
+stream: true
+tags:
+  - agent
+  - coding
+  - long-context
+  - prefix-cache
+requests:
+  - name: turn-1-plan
+    session_id: enterprise-coding-session
+    max_tokens: 350
+    messages:
+      - role: system
+        content: |
+          You are an advanced enterprise coding assistant.
+          <repo_context>
+          # Many simulated files would be here in a real 32K scenario
+          src/main.py: 500 lines
+          src/db.py: 1200 lines
+          src/api/routes.py: 800 lines
+          </repo_context>
+      - role: user
+        content: Please migrate the SQLite backend to PostgreSQL in db.py. First, search for current connections.
+    tools:
+      - type: function
+        function:
+          name: search_code
+          description: Search the repository for structural patterns.
+          parameters:
+            type: object
+            properties:
+              query: {type: string}
+            required: [query]
+  - name: turn-2-read
+    session_id: enterprise-coding-session
+    max_tokens: 200
+    messages:
+      - role: system
+        content: You are an advanced enterprise coding assistant.
+      - role: user
+        content: Please migrate the SQLite backend to PostgreSQL in db.py. First, search for current connections.
+      - role: assistant
+        content: '{"tool_calls": [{"id": "call_1", "type": "function", "function": {"name": "search_code", "arguments": "{\"query\": \"sqlite3.connect\"}"}}]}'
+      - role: tool
+        content: '[{"file": "src/db.py", "line": 42, "match": "conn = sqlite3.connect(DB_PATH)"}]'
+      - role: user
+        content: I found the connection. Now read the file.
+  - name: turn-3-patch
+    session_id: enterprise-coding-session
+    max_tokens: 800
+    messages:
+      - role: system
+        content: You are an advanced enterprise coding assistant.
+      - role: user
+        content: I found the connection. Now read the file.
+      - role: assistant
+        content: 'I will read the file and formulate a patch.'
+      - role: user
+        content: Please generate the unified diff patch to replace sqlite3 with psycopg2.
+    tools:
+      - type: function
+        function:
+          name: apply_patch
+          description: Apply unified diff patch to the repository.
+          parameters:
+            type: object
+            properties:
+              diff: {type: string}
+            required: [diff]
+  - name: turn-4-test
+    session_id: enterprise-coding-session
+    max_tokens: 150
+    messages:
+      - role: system
+        content: You are an advanced enterprise coding assistant.
+      - role: user
+        content: The patch applied successfully. Run the test suite.
+    tools:
+      - type: function
+        function:
+          name: run_tests
+          description: Execute pytest suite.
+          parameters:
+            type: object
+            properties:
+              filter: {type: string}
+            required: []
+  - name: turn-5-fix
+    session_id: enterprise-coding-session
+    max_tokens: 400
+    messages:
+      - role: system
+        content: You are an advanced enterprise coding assistant.
+      - role: user
+        content: |
+          Test failed with 'psycopg2.OperationalError: FATAL: role "root" does not exist'. Fix it.
+  - name: turn-6-test-again
+    session_id: enterprise-coding-session
+    max_tokens: 150
+    messages:
+      - role: system
+        content: You are an advanced enterprise coding assistant.
+      - role: user
+        content: The fix is applied. Run tests again.
+  - name: turn-7-lint
+    session_id: enterprise-coding-session
+    max_tokens: 150
+    messages:
+      - role: system
+        content: You are an advanced enterprise coding assistant.
+      - role: user
+        content: Tests passed. Now run the linter on db.py.
+  - name: turn-8-pr
+    session_id: enterprise-coding-session
+    max_tokens: 450
+    messages:
+      - role: system
+        content: You are an advanced enterprise coding assistant.
+      - role: user
+        content: Linting passed. Open a pull request with a detailed summary of the migration.

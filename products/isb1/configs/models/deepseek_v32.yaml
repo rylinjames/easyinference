@@ -1,0 +1,36 @@
+model_name: "DeepSeek-V3-0324"
+model_short: "dsv32"
+hf_model_id: "deepseek-ai/DeepSeek-V3-0324"
+architecture_class: "frontier_mla_moe"
+attention_type: "mla"
+routing_type: "moe"
+total_params_b: 671
+active_params_b: 37
+num_experts: 256
+experts_per_token: 8
+num_kv_heads: null  # MLA uses latent compression
+max_model_len: 131072
+default_max_model_len: 32768
+trust_remote_code: true
+tokenizer_mode: "auto"
+available: true
+min_gpus:
+  bf16:
+    h100: 16
+    h200: 8
+    b200: 8
+    b300: 4
+  fp8:
+    h100: 8
+    h200: 4
+    b200: 4
+    b300: 4
+  nvfp4:
+    b200: 4
+    b300: 2
+recommended_topology:
+  fp8:
+    h100: "ep8"
+    h200: "ep8"
+    b200: "ep4"
+    b300: "ep4"

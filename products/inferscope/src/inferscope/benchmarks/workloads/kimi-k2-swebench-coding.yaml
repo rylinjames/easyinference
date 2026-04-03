@@ -1,0 +1,87 @@
+version: "1"
+name: kimi-k2-swebench-coding
+description: Long-context coding workload for Kimi-K2.5 using real SWE-bench_Verified GitHub issues with CodeSearchNet repo context padding.
+workload_class: coding
+benchmark_role: production
+target_gpu_families: [hopper, blackwell, blackwell_ultra]
+target_model_classes: [classical_moe]
+focus_areas: [long_context, coding, prefix_cache, lmcache, swebench, reliability, observability]
+model: Kimi-K2.5
+concurrency: 4
+stream: true
+tags:
+  - kimi
+  - dynamo
+  - coding
+  - long-context
+  - swebench
+  - production
+  - prefix-reuse
+  - dataset:princeton-nlp/SWE-bench_Verified
+  - context-padding:code-search-net/code_search_net
+requests:
+  - name: issue-diagnosis-32k
+    session_id: swe-coding-session-a
+    max_tokens: 512
+    metadata:
+      approx_context_tokens: 32768
+      context_bucket: 32k
+      dataset: swebench_verified
+    messages:
+      - role: system
+        content: |
+          You are a production software engineer. You have access to the full repository context below.
+          Your task is to diagnose issues and produce minimal, correct patches.
+          Preserve exact file paths, keep edits minimal, and explain your reasoning.
+
+          Repository: django/django
+
+          # Repository context (CodeSearchNet functions matching this domain)
+          [Context padded to ~32K tokens from CodeSearchNet Python functions]
+      - role: user
+        content: |
+          The QuerySet.only() method doesn't properly defer fields when used with select_related().
+          When both are combined, all fields are loaded instead of only the specified ones.
+          Diagnose the root cause and identify which files need to change.
+  - name: patch-generation-32k
+    session_id: swe-coding-session-a
+    max_tokens: 1024
+    metadata:
+      approx_context_tokens: 32768
+      context_bucket: 32k
+      dataset: swebench_verified
+    messages:
+      - role: system
+        content: |
+          You are a production software engineer. You have access to the full repository context below.
+          Your task is to diagnose issues and produce minimal, correct patches.
+      - role: user
+        content: |
+          The QuerySet.only() method doesn't properly defer fields when used with select_related().
+      - role: assistant
+        content: The root cause is in django/db/models/sql/query.py where deferred_loading is reset during select_related resolution.
+      - role: user
+        content: |
+          Now write the minimal patch that fixes this issue. Output a unified diff and explain each change.
+  - name: issue-diagnosis-64k
+    session_id: swe-coding-session-b
+    max_tokens: 512
+    metadata:
+      approx_context_tokens: 65536
+      context_bucket: 64k
+      dataset: swebench_verified
+    messages:
+      - role: system
+        content: |
+          You are a production software engineer operating on a large monorepo.
+          Preserve exact file paths, keep edits minimal, and call out reliability regressions.
+
+          Repository: scikit-learn/scikit-learn
+
+          # Repository context (CodeSearchNet functions matching this domain)
+          [Context padded to ~64K tokens from CodeSearchNet Python functions]
+      - role: user
+        content: |
+          ColumnTransformer with remainder='passthrough' raises ValueError when the input DataFrame
+          has columns with special characters. The error occurs during the _validate_remainder step.
+          This worked in v1.2 but broke in v1.3. Identify the regression.

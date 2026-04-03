@@ -1,0 +1,56 @@
+workload_name: "rag"
+workload_id: "wl3"
+description: "Prefill-dominant workload with 32K-128K token retrieved contexts"
+
+trace:
+  type: "synthetic_rag"
+  generator: "workloads.rag.RAGTraceGenerator"
+  seed: 42
+  num_requests: 1000
+  system_prompt_tokens: 200
+  retrieval_instruction_tokens: 300
+  num_chunks:
+    min: 5
+    max: 20
+  chunk_tokens:
+    min: 1000
+    max: 5000
+  user_query_tokens:
+    min: 50
+    max: 200
+
+context:
+  input_tokens:
+    distribution: "bimodal"
+    cluster_1:
+      center: 32000
+      weight: 0.6
+    cluster_2:
+      center: 96000
+      weight: 0.4
+  output_tokens:
+    median: 400
+    min: 100
+    max: 800
+
+arrival:
+  model: "poisson"
+  rate_sweep: [0.25, 0.5, 1, 2, 4, 8, 16]
+
+session:
+  sticky: false
+  prefix_reuse: false
+  shared_prefix_tokens: 500  # system prompt + retrieval template
+
+sampling:
+  temperature: 0.0
+  max_tokens: 1024
+
+slo:
+  ttft_p95_ms:
+    "32k": 6000
+    "96k": 20000
+  tpot_p95_ms: 100
+
+priority: "ttft"
+timeout_seconds: 300

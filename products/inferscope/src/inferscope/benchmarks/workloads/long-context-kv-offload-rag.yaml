@@ -1,0 +1,63 @@
+version: "1"
+name: long-context-kv-offload-rag
+description: Realistic multi-turn long-context RAG workload intended to exercise KV spill, cold-session reuse, and offload-aware serving.
+workload_class: long_context_rag
+benchmark_role: topology_probe
+target_gpu_families: [hopper, hopper_grace, blackwell, blackwell_ultra, blackwell_grace, blackwell_ultra_grace, cdna3, cdna4]
+target_model_classes: [dense_gqa, qwen35_hybrid, frontier_mla_moe]
+focus_areas: [long_context, kv_offload, session_reuse, rag]
+model: Qwen3.5-72B
+concurrency: 1
+stream: true
+tags:
+  - long-context
+  - rag
+  - kv-offload
+  - session-reuse
+  - realistic
+requests:
+  - name: initial-briefing
+    session_id: rag-kv-session-1
+    max_tokens: 320
+    temperature: 0.1
+    metadata:
+      approx_context_tokens: 96000
+    messages:
+      - role: system
+        content: You are a retrieval-augmented analyst. Use the supplied corpus conservatively and keep track of unresolved contradictions.
+      - role: user
+        content: |
+          Review the following retrieved enterprise incident corpus.
+          <retrieved_corpus>
+          Imagine this block contains 96,000 tokens of incident tickets, architecture notes,
+          postmortems, and operating procedures loaded by the benchmark harness.
+          </retrieved_corpus>
+
+          Produce a short incident summary, list the top three unresolved risks, and name the
+          evidence clusters you relied on.
+  - name: follow-up-gap-analysis
+    session_id: rag-kv-session-1
+    max_tokens: 280
+    temperature: 0.1
+    metadata:
+      approx_context_tokens: 96000
+    messages:
+      - role: system
+        content: You are a retrieval-augmented analyst. Reuse the previously retrieved corpus and preserve exact uncertainty.
+      - role: user
+        content: |
+          Using the same retrieved corpus, identify which claims still need verification and
+          which teams or systems are most exposed if the incident repeats.
+  - name: final-mitigation-priorities
+    session_id: rag-kv-session-1
+    max_tokens: 220
+    temperature: 0.1
+    metadata:
+      approx_context_tokens: 96000
+    messages:
+      - role: system
+        content: You are a retrieval-augmented analyst. Focus on operational mitigation priorities.
+      - role: user
+        content: |
+          Reuse the retrieved corpus one more time and rank the next actions by urgency,
+          implementation cost, and likelihood of preventing recurrence.

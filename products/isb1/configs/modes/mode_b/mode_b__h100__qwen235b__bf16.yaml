@@ -1,0 +1,29 @@
+mode: mode_b
+description: Mode B (InferScope-optimized) — Qwen3.5-235B-A22B on H100-SXM-80GB (baseline
+  bf16 -> optimized fp8)
+baseline_quantization: bf16
+gpu: h100
+gpu_name: H100-SXM-80GB
+model: qwen235b
+model_name: Qwen3.5-235B-A22B
+hf_model_id: Qwen/Qwen3.5-235B-A22B
+quantization: fp8
+tensor_parallel_size: 2
+gpu_memory_utilization: 0.95
+max_num_seqs: 32
+max_num_batched_tokens: 16750
+enable_prefix_caching: true
+enable_chunked_prefill: true
+kv_cache_dtype: fp8_e4m3
+dtype: auto
+engine: vllm
+optimized_by: inferscope
+reasoning_summary:
+- 'HardwareNode: Detected NVIDIA H100 SXM (Hopper) with 80GB memory.'
+- 'HardwareNode: Hopper Tier 1 — vLLM for chat (FlashAttention-3 via wgmma/TMA, zero-overhead
+  prefix caching, Hopper-optimized chunked prefill).'
+- 'HardwareNode: Native FP8 support detected; use FP8 as the default throughput/quality
+  tradeoff.'
+- 'ModelNode: Analyzing Qwen3.5-397B-A17B (397B total, qwen35_hybrid).'
+- 'ModelNode: Resolved routing topology to TP=2, EP=1, DP=4.'
+data_parallel_size: 4

@@ -1,0 +1,31 @@
+version: "1"
+name: disagg-long-prompt
+description: Massive prompt workload designed to test KV cache transfer latency in disaggregated prefill setups.
+workload_class: coding
+benchmark_role: topology_probe
+target_gpu_families: [hopper, hopper_grace, blackwell, blackwell_ultra, blackwell_grace, blackwell_ultra_grace, cdna3, cdna4]
+target_model_classes: [qwen35_hybrid, frontier_mla_moe, compact_agentic_moe]
+focus_areas: [disaggregation, kv_transfer, ttft, long_context]
+model: Qwen3.5-32B
+concurrency: 1
+stream: true
+tags:
+  - disaggregated
+  - ttft
+  - long-context
+requests:
+  - name: full-repo-review
+    session_id: disagg-session
+    max_tokens: 256
+    messages:
+      - role: system
+        content: |
+          You are a security auditor. Analyze the following exhaustive repository dump.
+          <repo_dump>
+          Imagine this block contains 64,000 tokens of Python, Rust, and YAML source code.
+          For the purpose of benchmarking, the proxy will load the real multi-megabyte payload.
+          </repo_dump>
+      - role: user
+        content: |
+          Provide a bulleted list of the top 3 critical security vulnerabilities across the codebase.
+          Do not explain how to fix them, just list them.

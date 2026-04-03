@@ -1,0 +1,16 @@
+quality_eval: "ruler"
+description: "RULER long-context evaluation for context fidelity"
+
+metric: "accuracy"
+context_lengths: [4096, 8192, 16384, 32768, 65536, 131072]
+tasks: ["niah_single", "niah_multikey", "vt", "cwe", "fwe", "qa"]
+
+max_tokens: 256
+temperature: 0.0
+seed: 42
+
+quality_gates:
+  accuracy_delta:
+    pass: -0.02
+    marginal: -0.05
+    fail: -0.05

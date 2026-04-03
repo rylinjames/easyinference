@@ -1,0 +1,53 @@
+workload_name: "chat"
+workload_id: "wl1"
+description: "High-concurrency, short-context, multi-turn conversational serving"
+
+# Trace source
+trace:
+  type: "sharegpt"
+  source: "ShareGPT_V3_unfiltered_cleaned_split.json"
+  num_requests: 1000
+  filter:
+    min_turns: 1
+    max_turns: 5
+  seed: 42
+
+# Context distribution
+context:
+  input_tokens:
+    median: 500
+    min: 50
+    max: 4000
+  output_tokens:
+    median: 200
+    min: 10
+    max: 1024
+
+# Arrival model
+arrival:
+  model: "poisson"
+  rate_sweep: [1, 2, 4, 8, 16, 32, 64, 128, 256]
+  saturation_ttft_p99_ms: 10000
+  saturation_error_rate: 0.01
+
+# Session behavior
+session:
+  sticky: true
+  prefix_reuse: true
+
+# Sampling
+sampling:
+  temperature: 0.7
+  top_p: 0.9
+  max_tokens: 1024
+
+# SLO gates
+slo:
+  ttft_p95_ms: 2000
+  tpot_p95_ms: 100
+
+# Priority
+priority: "throughput"
+
+# Timeout
+timeout_seconds: 120

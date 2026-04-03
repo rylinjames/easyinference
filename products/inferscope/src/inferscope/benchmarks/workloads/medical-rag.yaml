@@ -1,0 +1,37 @@
+version: "1"
+name: medical-rag
+description: Long-context medical literature retrieval workload with conservative generation.
+workload_class: medical_rag
+benchmark_role: reference
+target_gpu_families: [hopper, hopper_grace, blackwell, blackwell_ultra, blackwell_grace, blackwell_ultra_grace, cdna3, cdna4]
+target_model_classes: [dense_gqa, qwen35_hybrid, frontier_mla_moe]
+focus_areas: [rag, long_context, evidence_grounding]
+model: Qwen3.5-72B
+concurrency: 1
+stream: true
+tags:
+  - medical
+  - rag
+  - evidence-grounding
+requests:
+  - name: literature-summary
+    session_id: med-session-1
+    max_tokens: 300
+    temperature: 0.1
+    messages:
+      - role: system
+        content: You are a medical research assistant. Be conservative and cite evidence.
+      - role: user
+        content: |
+          Summarize the retrieved oncology literature, preserve contradictions, and
+          highlight open questions for clinical review.
+  - name: follow-up-risk-check
+    session_id: med-session-1
+    max_tokens: 220
+    temperature: 0.1
+    messages:
+      - role: system
+        content: You are a medical research assistant. Be conservative and cite evidence.
+      - role: user
+        content: |
+          Using the same retrieved context, list contraindications and confidence gaps.

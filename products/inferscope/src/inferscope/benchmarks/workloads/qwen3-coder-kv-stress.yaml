@@ -1,0 +1,111 @@
+version: "1"
+name: qwen3-coder-kv-stress
+description: >-
+  KV cache stress workload for Qwen3-Coder-Next targeting capacity probing,
+  prefix reuse measurement, and disaggregated transfer profiling on Hopper GPUs.
+  Escalating context lengths from 8K to 131K across multi-turn coding sessions.
+workload_class: coding
+benchmark_role: kv_stress
+target_gpu_families: [hopper, blackwell, blackwell_ultra]
+target_model_classes: [qwen35_hybrid, classical_moe]
+focus_areas: [kv_cache, disaggregated, prefix_cache, lmcache, long_context]
+concurrency: 2
+stream: true
+tags:
+  - qwen3-coder
+  - kv-stress
+  - long-context
+  - disaggregated
+  - prefix-cache
+
+requests:
+  - name: kv-probe-8k
+    session_id: qwen-kv-session-a
+    max_tokens: 256
+    metadata:
+      approx_context_tokens: 8192
+    messages:
+      - role: system
+        content: |
+          You are a production coding assistant operating on a large monorepo.
+          Preserve exact file paths, keep edits minimal, and call out reliability regressions.
+
+          # Repository digest (shared prefix for cache reuse measurement)
+          services/gateway/router.py: request routing and admission control
+          services/runtime/worker.py: long-context generation and cache plumbing
+          services/runtime/kv_router.py: cache-aware worker selection
+          observability/prometheus.py: metric export and label hygiene
+      - role: user
+        content: |
+          Review the repository context. What is the most likely first bottleneck
+          when scaling to 32 concurrent coding sessions at 32K context?
+
+  - name: kv-probe-32k
+    session_id: qwen-kv-session-a
+    max_tokens: 512
+    metadata:
+      approx_context_tokens: 32768
+    messages:
+      - role: system
+        content: |
+          You are a production coding assistant operating on a large monorepo.
+          Preserve exact file paths, keep edits minimal, and call out reliability regressions.
+
+          # Repository digest (shared prefix for cache reuse measurement)
+          services/gateway/router.py: request routing and admission control
+          services/runtime/worker.py: long-context generation and cache plumbing
+          services/runtime/kv_router.py: cache-aware worker selection
+          observability/prometheus.py: metric export and label hygiene
+      - role: user
+        content: |
+          Review the repository context. What is the most likely first bottleneck
+          when scaling to 32 concurrent coding sessions at 32K context?
+      - role: assistant
+        content: The binding constraint is KV cache memory on the decode workers.
+      - role: user
+        content: |
+          Given KV cache is the bottleneck, produce a patch plan for the worker.py
+          and kv_router.py files that implements LMCache CPU tier offloading with
+          session-aware eviction. Include the exact config changes needed.
+
+  - name: kv-probe-65k
+    session_id: qwen-kv-session-b
+    max_tokens: 512
+    metadata:
+      approx_context_tokens: 65536
+    messages:
+      - role: system
+        content: |
+          You are a production coding assistant reviewing a large diff.
+          Focus on correctness, performance implications, and observability gaps.
+
+          # Full diff context (~65K tokens of repository code)
+          The diff modifies 47 files across services/gateway, services/runtime,
+          and observability packages. Key changes include KV cache tiering,
+          NIXL transfer configuration, and disaggregated topology setup.
+      - role: user
+        content: |
+          Review this diff for correctness and performance regressions.
+          Flag any changes that could cause KV cache pressure under load.
+
+  - name: kv-probe-131k
+    session_id: qwen-kv-session-b
+    max_tokens: 640
+    metadata:
+      approx_context_tokens: 131072
+    messages:
+      - role: system
+        content: |
+          You are a production coding assistant reviewing a large diff.
+          Focus on correctness, performance implications, and observability gaps.
+
+          # Full diff context (~131K tokens of repository code)
+          Complete repository snapshot including all service implementations,
+          configuration files, deployment manifests, and test suites for
+          a disaggregated inference serving system with KV cache tiering.
+      - role: user
+        content: |
+          Given the full repository context, design the optimal KV cache
+          configuration for serving 20 concurrent 131K-context coding sessions
+          on 8xH200 with Dynamo disaggregated topology. Include exact
+          LMCache tier sizes, NIXL buffer configuration, and Grove eviction policy.

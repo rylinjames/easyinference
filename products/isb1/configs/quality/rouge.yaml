@@ -1,0 +1,22 @@
+quality_eval: "rouge"
+description: "ROUGE-1/2/L against BF16 reference outputs"
+
+metrics: ["rouge_1", "rouge_2", "rouge_l"]
+
+num_prompts: 200
+prompt_source: "sharegpt_subset"
+seed: 42
+
+quality_gates:
+  rouge_l_delta:
+    pass: -0.01        # >= -1.0% delta vs BF16
+    marginal: -0.02    # >= -2.0% delta vs BF16
+    fail: -0.02        # < -2.0% delta vs BF16
+
+sampling:
+  temperature: 0.0
+  max_tokens: 1024
+
+reference:
+  quantization: "bf16"
+  output_dir: "quality/reference_outputs"
