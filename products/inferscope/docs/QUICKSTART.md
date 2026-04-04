@@ -25,8 +25,6 @@ You need:
 
 The examples below assume a local endpoint at `http://localhost:8000`.
 
-Until the source-checkout console-script path is corrected, run InferScope commands from this repo checkout with `PYTHONPATH=src`.
-
 ## 1. Install
 
 Clone the repo and sync the InferScope environment:
@@ -34,13 +32,13 @@ Clone the repo and sync the InferScope environment:
 ```bash
 git clone https://github.com/rylinjames/easyinference.git
 cd easyinference/products/inferscope
-uv sync --dev
+uv sync --dev --no-editable
 ```
 
 Sanity-check that the CLI is available:
 
 ```bash
-PYTHONPATH=src uv run python -m inferscope.cli --help
+uv run inferscope --help
 ```
 
 Success looks like a Typer help screen with commands such as:
@@ -56,13 +54,13 @@ Success looks like a Typer help screen with commands such as:
 Profile a live runtime first. This is the highest-value path in InferScope today.
 
 ```bash
-PYTHONPATH=src uv run python -m inferscope.cli profile-runtime http://localhost:8000
+uv run inferscope profile-runtime http://localhost:8000
 ```
 
 If you already know deployment details, add them for better recommendations:
 
 ```bash
-PYTHONPATH=src uv run python -m inferscope.cli profile-runtime http://localhost:8000 \
+uv run inferscope profile-runtime http://localhost:8000 \
   --gpu-arch sm_100 \
   --model-name Kimi-K2.5 \
   --quantization fp8 \
@@ -88,7 +86,7 @@ You are looking for evidence such as:
 Once runtime profiling works, resolve the supported packaged probe plan:
 
 ```bash
-PYTHONPATH=src uv run python -m inferscope.cli benchmark-plan \
+uv run inferscope benchmark-plan \
   kimi-k2-long-context-coding \
   http://localhost:8000 \
   --gpu b200 \
@@ -100,7 +98,7 @@ Success looks like a JSON response describing the supported plan for the current
 If you want to run a probe after that:
 
 ```bash
-PYTHONPATH=src uv run python -m inferscope.cli benchmark \
+uv run inferscope benchmark \
   kimi-k2-long-context-coding \
   http://localhost:8000 \
   --experiment dynamo-disagg-lmcache-kimi-k2 \
@@ -119,7 +117,7 @@ Benchmark artifacts are persisted under:
 After the CLI path works, start the MCP server:
 
 ```bash
-PYTHONPATH=src uv run python -m inferscope.cli serve
+uv run inferscope serve
 ```
 
 Use this configuration in an MCP client such as Cursor or Claude Desktop:
@@ -133,9 +131,7 @@ Use this configuration in an MCP client such as Cursor or Claude Desktop:
         "run",
         "--directory",
         "/absolute/path/to/EasyInference/products/inferscope",
-        "python",
-        "-m",
-        "inferscope.cli",
+        "inferscope",
         "serve"
       ]
     }
@@ -161,6 +157,7 @@ If `uv sync --dev` fails:
 
 - confirm `uv` is installed
 - confirm you are in `products/inferscope`
+- if you are working from a source checkout, use `uv sync --dev --no-editable`
 
 If `profile-runtime` fails immediately:
 
@@ -175,11 +172,11 @@ If the output is thin or generic:
 If MCP connects but tools do not appear:
 
 - make sure the MCP command points at `products/inferscope`
-- make sure the command includes `python -m inferscope.cli serve`
 - restart the MCP client after saving the config
 
 ## Next Docs
 
+- [MCP Quickstart](./MCP_QUICKSTART.md)
 - [Runtime Profiling](./PROFILING.md)
 - [Benchmark Plan](./BENCHMARK-PLAN.md)
 - [Benchmarks](./BENCHMARKS.md)

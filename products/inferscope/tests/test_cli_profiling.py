@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 from typer.testing import CliRunner
 
 from inferscope.cli import app
@@ -40,3 +43,45 @@ def test_cli_help_includes_runtime_and_legacy_commands() -> None:
     assert result.exit_code == 0, result.stdout
     for command_name in ("profile-runtime", "profile", "check", "memory", "cache", "audit"):
         assert command_name in result.stdout
+
+
+def test_cli_connect_outputs_stdio_mcp_config(tmp_path: Path) -> None:
+    result = runner.invoke(
+        app,
+        [
+            "connect",
+            "--project-dir",
+            str(tmp_path),
+            "--server-name",
+            "InferScope",
+        ],
+    )
+
+    assert result.exit_code == 0, result.stdout
+    config = json.loads(result.stdout)
+    server = config["mcpServers"]["InferScope"]
+    assert server["command"] == "uv"
+    assert server["args"][:3] == ["run", "--no-editable", "--directory"]
+    assert server["args"][3] == str(tmp_path.resolve())
+    assert server["args"][4:] == ["inferscope", "serve"]
+
+
+def test_cli_connect_outputs_http_mcp_config(tmp_path: Path) -> None:
+    result = runner.invoke(
+        app,
+        [
+            "connect",
+            "--project-dir",
+            str(tmp_path),
+            "--transport",
+            "streamable-http",
+            "--port",
+            "9123",
+        ],
+    )
+
+    assert result.exit_code == 0, result.stdout
+    config = json.loads(result.stdout)
+    server = config["mcpServers"]["InferScope"]
+    assert server["transport"] == "streamable-http"
+    assert server["url"] == "http://127.0.0.1:9123/mcp"

@@ -22,15 +22,15 @@
 
 - Confirmed `products/inferscope/docs/QUICKSTART.md` is linked from both README entry points.
 - Confirmed the working source-checkout invocation is:
-  - `PYTHONPATH=src uv run python -m inferscope.cli --help`
-- Confirmed the plain console-script invocation currently fails from source checkout:
+  - `uv sync --dev --no-editable`
   - `uv run inferscope --help`
-  - failure: `ModuleNotFoundError: No module named 'inferscope'`
+- Confirmed the generated launcher works after the packaging fix:
+  - `.venv/bin/inferscope --help`
 
 ## Remaining Gaps
 
-- The console-script packaging path still needs a separate fix so the repo checkout can use `uv run inferscope ...` without the `PYTHONPATH=src` workaround.
 - MCP onboarding still deserves its own focused doc under `cursor_mcp_quickstart.md`.
+- The source-checkout path should eventually avoid requiring `--no-editable` if the upstream hidden `.pth` behavior is resolved cleanly.
 
 ## Next Steps
 

@@ -108,26 +108,27 @@ If you need deployment diagnosis, use **InferScope**.
 Use the dedicated quickstart for the fastest supported path:
 
 - [docs/QUICKSTART.md](docs/QUICKSTART.md)
+- [docs/MCP_QUICKSTART.md](docs/MCP_QUICKSTART.md)
 
 The short version is:
 
 ```bash
 git clone https://github.com/rylinjames/easyinference.git
 cd easyinference/products/inferscope
-uv sync --dev
+uv sync --dev --no-editable
 
 # inspect live runtime behavior first
-PYTHONPATH=src uv run python -m inferscope.cli profile-runtime http://localhost:8000 --gpu-arch sm_100
+uv run inferscope profile-runtime http://localhost:8000 --gpu-arch sm_100
 
 # resolve the supported probe plan once profiling works
-PYTHONPATH=src uv run python -m inferscope.cli benchmark-plan \
+uv run inferscope benchmark-plan \
   kimi-k2-long-context-coding \
   http://localhost:8000 \
   --gpu b200 \
   --num-gpus 8
 
 # run a production-lane probe
-PYTHONPATH=src uv run python -m inferscope.cli benchmark \
+uv run inferscope benchmark \
   kimi-k2-long-context-coding \
   http://localhost:8000 \
   --experiment dynamo-disagg-lmcache-kimi-k2 \
@@ -135,10 +136,10 @@ PYTHONPATH=src uv run python -m inferscope.cli benchmark \
   --num-gpus 8
 
 # compare artifacts
-PYTHONPATH=src uv run python -m inferscope.cli benchmark-compare before.json after.json
+uv run inferscope benchmark-compare before.json after.json
 
 # run MCP server after the CLI path works
-PYTHONPATH=src uv run python -m inferscope.cli serve
+uv run inferscope serve
 ```
 
 ## Procedural expansion
@@ -173,6 +174,7 @@ MCP intentionally rejects `context_file` because it is a local file expansion me
 
 - [ARCHITECTURE.md](ARCHITECTURE.md)
 - [docs/QUICKSTART.md](docs/QUICKSTART.md)
+- [docs/MCP_QUICKSTART.md](docs/MCP_QUICKSTART.md)
 - [docs/PROFILING.md](docs/PROFILING.md)
 - [docs/BENCHMARKS.md](docs/BENCHMARKS.md)
 - [docs/BENCHMARK-PLAN.md](docs/BENCHMARK-PLAN.md)

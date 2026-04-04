@@ -104,6 +104,41 @@ def _resolve_metrics_auth(
         raise typer.BadParameter(str(exc)) from exc
 
 
+def _build_mcp_config(
+    *,
+    project_dir: Path,
+    server_name: str,
+    transport: str,
+    port: int,
+) -> dict[str, object]:
+    project_dir = project_dir.resolve()
+    if transport == "stdio":
+        return {
+            "mcpServers": {
+                server_name: {
+                    "command": "uv",
+                    "args": [
+                        "run",
+                        "--no-editable",
+                        "--directory",
+                        str(project_dir),
+                        "inferscope",
+                        "serve",
+                    ],
+                }
+            }
+        }
+
+    return {
+        "mcpServers": {
+            server_name: {
+                "transport": "streamable-http",
+                "url": f"http://127.0.0.1:{port}/mcp",
+            }
+        }
+    }
+
+
 @app.command()
 def profile(model: str = typer.Argument(help="Model name (e.g., DeepSeek-R1, Qwen3.5-72B)")):
     """Show serving profile for a model across all supported engines and GPUs."""
@@ -311,6 +346,27 @@ def evaluate(
 
 register_profiling_commands(app, print_result=_print_result, resolve_metrics_auth=_resolve_metrics_auth)
 register_benchmark_commands(app, print_result=_print_result)
+
+
+@app.command()
+def connect(
+    project_dir: Path = typer.Option(
+        Path.cwd(),
+        "--project-dir",
+        help="Path to the local products/inferscope checkout.",
+    ),
+    server_name: str = typer.Option("InferScope", help="Server name to emit in the MCP config."),
+    transport: str = typer.Option("stdio", help="Transport: stdio or streamable-http."),
+    port: int = typer.Option(8765, help="Port for streamable-http transport."),
+):
+    """Print MCP configuration JSON for Cursor or Claude Desktop."""
+    config = _build_mcp_config(
+        project_dir=project_dir,
+        server_name=server_name,
+        transport=transport,
+        port=port,
+    )
+    typer.echo(json.dumps(config, indent=2))
 
 
 @app.command()
