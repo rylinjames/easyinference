@@ -15,6 +15,18 @@ This quickstart is intentionally narrow. It uses the strongest product path in I
 - optional `benchmark-plan` once the runtime profile succeeds
 - optional MCP connection after the CLI path works
 
+## Supported product lane
+
+This quickstart is written for the current supported InferScope lane, not the full long-term EasyInference platform vision.
+
+- **Model lane:** `Kimi-K2.5`
+- **Production engine:** `dynamo`
+- **Comparison engine:** `vllm`
+- **Workload pack:** `kimi-k2-long-context-coding`
+- **GPU targets:** `h100`, `h200`, `b200`, `b300`
+
+If you are outside that lane, use this guide as a source-checkout and workflow reference, not as a claim that your exact deployment shape is already supported.
+
 ## Before You Start
 
 You need:

@@ -40,6 +40,25 @@ Use `products/inferscope/` when you need:
 InferScope is intentionally narrower than a generic benchmark product.
 It is being shaped around KV-cache, offload, and disaggregated-serving analysis.
 
+## Current State vs Long-Term Direction
+
+### What exists today
+
+- **ISB-1** is the benchmark-standard and workload-harness product in this repo.
+- **InferScope** is the shipped operator surface for runtime profiling, narrow probe execution, artifact comparison, CLI usage, and MCP usage.
+- The current supported human workflows are CLI-first and MCP-second.
+
+### What we are building toward
+
+EasyInference is intended to become a platform, not a terminal-only product.
+
+- **Primary interface:** managed web product
+- **Enterprise option:** self-hosted or local deployment of the same platform
+- **Secondary interfaces:** CLI and MCP
+- **Shared core:** one analysis engine and one API model underneath all interfaces
+
+That means the web-first platform is the long-term product shape, while CLI and MCP are the strongest supported interfaces today.
+
 ## Repository layout
 
 ```text

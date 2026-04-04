@@ -24,6 +24,30 @@ That separation is intentional.
 - **ISB-1** owns the local benchmark standard inside this repo.
 - **InferScope** owns the deployment-specific gap-analysis loop.
 
+## Current interface contract
+
+### What exists today
+
+InferScope is currently used through:
+
+- CLI commands such as `profile-runtime`, `benchmark-plan`, `benchmark`, and `benchmark-compare`
+- MCP tools exposed through `inferscope serve`
+
+That is the supported product interface today.
+
+### What this is building toward
+
+InferScope is not meant to remain terminal-first forever.
+
+The long-term EasyInference product shape is:
+
+- **Primary:** managed web product for human operators
+- **Enterprise option:** self-hosted or local deployment of the same platform
+- **Secondary:** CLI and MCP for automation and power-user workflows
+- **Shared core:** one analysis engine and one API model underneath all interfaces
+
+This README describes the currently shipped CLI and MCP surface, not a fully built web product.
+
 ## Current supported production contract
 
 As of **March 28, 2026**, InferScope is intentionally narrowed to one product lane:
@@ -43,6 +67,15 @@ Supported packaged probe experiments:
 - `dynamo-disagg-lmcache-kimi-k2`
 
 This scope is enforced by the product contract in `src/inferscope/production_target.py`.
+
+## Supported today vs planned expansion
+
+InferScope should be read as a deliberately narrow product right now.
+
+- **Supported today:** the production contract listed above
+- **Planned later:** broader model, engine, hardware, and interface expansion
+
+If a workflow or deployment shape is not covered by the current production contract, treat it as planned or experimental rather than implicitly supported.
 
 ## What InferScope does now
 
