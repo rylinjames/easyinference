@@ -8,11 +8,43 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from inferscope.benchmarks.models import WorkloadPack, WorkloadRequest, ChatMessage
+from inferscope.benchmarks.openai_replay import run_openai_replay
 from inferscope.optimization.memory_planner import plan_memory, MemoryPlan
 from inferscope.models.registry import ModelVariant
 from inferscope.hardware.gpu_profiles import GPUProfile
 
 logger = logging.getLogger(__name__)
+
+
+def _build_capacity_probe_pack(model_name: str, isl: int, concurrency: int) -> WorkloadPack:
+    requests = [
+        WorkloadRequest(
+            name=f"capacity-isl-{isl}-req-{idx + 1}",
+            messages=[
+                ChatMessage(
+                    role="user",
+                    content=f"Summarize the capacity probe context for a {isl}-token prompt.",
+                )
+            ],
+            max_tokens=64,
+            metadata={
+                "phase": "kv_capacity_probe",
+                "isl": isl,
+                "approx_context_tokens": isl,
+                "probe_concurrency": concurrency,
+            },
+        )
+        for idx in range(concurrency)
+    ]
+    return WorkloadPack(
+        name=f"kv-capacity-probe-{isl}",
+        description="Live KV capacity probe",
+        workload_class="kv_capacity_probe",
+        model=model_name,
+        concurrency=concurrency,
+        stream=True,
+        requests=requests,
+    )
 
 
 @dataclass
@@ -152,5 +184,91 @@ def estimate_capacity_curve(
         result.warnings.extend(model.serving["warnings"])
     if mem.estimation_mode != "exact":
         result.warnings.append(f"KV estimation mode: {mem.estimation_mode}")
+
+    return result
+
+
+async def run_kv_capacity_probe(
+    endpoint: str,
+    model_name: str,
+    *,
+    metrics_endpoint: str | None = None,
+    tp: int = 1,
+    precision: str = "fp8",
+    kv_precision: str = "bf16",
+    gpu_name: str = "",
+    isl_list: list[int] | None = None,
+    concurrency_candidates: list[int] | None = None,
+    ttft_slo_ms: float = 5000.0,
+    capture_metrics: bool = True,
+    client: Any | None = None,
+) -> KVCapacityProbeResult:
+    """Run a live KV capacity probe against an endpoint."""
+
+    if isl_list is None:
+        isl_list = [1024, 4096, 8192, 32768]
+    if concurrency_candidates is None:
+        concurrency_candidates = [1, 2, 4, 8, 16]
+
+    result = KVCapacityProbeResult(
+        model_name=model_name,
+        gpu_name=gpu_name,
+        tp=tp,
+        precision=precision,
+        kv_precision=kv_precision,
+        support_tier="live_probe",
+    )
+
+    for isl in sorted(isl_list):
+        best_point = CapacityPoint(
+            isl=isl,
+            max_concurrent=0,
+            degradation_type="reliability",
+            kv_memory_gb=0.0,
+            kv_usage_at_max=0.0,
+            confidence_kind="direct",
+        )
+
+        for concurrency in sorted(set(concurrency_candidates)):
+            artifact = await run_openai_replay(
+                _build_capacity_probe_pack(model_name, isl, concurrency),
+                endpoint,
+                model=model_name,
+                metrics_endpoint=metrics_endpoint,
+                capture_metrics=capture_metrics,
+                concurrency=concurrency,
+                client=client,
+            )
+            summary = artifact.summary
+            metrics = (artifact.metrics_after.normalized_metrics if artifact.metrics_after else {}) or {}
+            cache = metrics.get("cache", {})
+            succeeded = summary.failed == 0 and (
+                summary.ttft_p99_ms is None or summary.ttft_p99_ms <= ttft_slo_ms
+            )
+            if not succeeded:
+                best_point.degradation_type = "latency" if summary.failed == 0 else "reliability"
+                break
+
+            best_point = CapacityPoint(
+                isl=isl,
+                max_concurrent=concurrency,
+                degradation_type="none",
+                kv_memory_gb=0.0,
+                kv_usage_at_max=float(cache.get("kv_usage", 0.0) or 0.0),
+                ttft_baseline_ms=summary.ttft_avg_ms,
+                ttft_at_max_ms=summary.ttft_p99_ms or summary.ttft_avg_ms,
+                error_rate_at_max=(summary.failed / summary.total_requests) if summary.total_requests else 0.0,
+                confidence_kind="direct",
+            )
+
+        result.capacity_curve.append(best_point)
+
+    if result.capacity_curve:
+        first = result.capacity_curve[0]
+        last = result.capacity_curve[-1]
+        result.summary = (
+            f"Live capacity probe from {first.isl} to {last.isl} tokens. "
+            f"Max concurrency ranged from {first.max_concurrent} to {last.max_concurrent}."
+        )
 
     return result

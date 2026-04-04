@@ -29,6 +29,10 @@ from inferscope.benchmarks.models import (
     WorkloadPack,
     WorkloadRequest,
 )
+from inferscope.benchmarks.kv_cache_behavior import KVCacheBehaviorResult, run_kv_cache_behavior
+from inferscope.benchmarks.kv_capacity_probe import KVCapacityProbeResult, run_kv_capacity_probe
+from inferscope.benchmarks.kv_disagg_transfer import KVDisaggTransferResult, run_kv_disagg_transfer
+from inferscope.benchmarks.kv_pressure_ramp import KVPressureProfileResult, run_kv_pressure_ramp
 from inferscope.benchmarks.openai_replay import build_default_artifact_path, run_openai_replay
 from inferscope.benchmarks.procedural import ProceduralWorkloadOptions
 from inferscope.benchmarks.prometheus_capture import capture_endpoint_snapshot, capture_metrics_targets
@@ -52,6 +56,10 @@ __all__ = [
     "BenchmarkTopologyMetadata",
     "MetricSampleRecord",
     "MetricSnapshot",
+    "KVCacheBehaviorResult",
+    "KVCapacityProbeResult",
+    "KVDisaggTransferResult",
+    "KVPressureProfileResult",
     "ProceduralWorkloadOptions",
     "ResolvedMetricCaptureTarget",
     "WorkloadPack",
@@ -69,5 +77,9 @@ __all__ = [
     "parse_metrics_target_overrides",
     "resolve_experiment_reference",
     "resolve_workload_reference",
+    "run_kv_cache_behavior",
+    "run_kv_capacity_probe",
+    "run_kv_disagg_transfer",
+    "run_kv_pressure_ramp",
     "run_openai_replay",
 ]

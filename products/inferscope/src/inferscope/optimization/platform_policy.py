@@ -263,12 +263,6 @@ def resolve_engine_support(engine: EngineType | str, gpu: GPUProfile, multi_node
         ),
     )
 
-    return EngineSupport(
-        engine=engine_name,
-        tier=EngineSupportTier.UNSUPPORTED,
-        reason=f"Unknown engine '{engine_name}'.",
-    )
-
 
 def resolve_preferred_precision(
     model: ModelVariant,

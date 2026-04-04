@@ -2,17 +2,26 @@
 
 from __future__ import annotations
 
+from inferscope.engines.atom import ATOMAdapter, ATOMCompiler
 from inferscope.engines.base import ConfigCompiler, EngineAdapter
 from inferscope.engines.dynamo import DynamoAdapter, DynamoCompiler
+from inferscope.engines.sglang import SGLangAdapter, SGLangCompiler
+from inferscope.engines.trtllm import TRTLLMAdapter, TRTLLMCompiler
 from inferscope.engines.vllm import VLLMAdapter, VLLMCompiler
 
 _COMPILERS: dict[str, type[ConfigCompiler]] = {
+    "atom": ATOMCompiler,
     "dynamo": DynamoCompiler,
+    "sglang": SGLangCompiler,
+    "trtllm": TRTLLMCompiler,
     "vllm": VLLMCompiler,
 }
 
 _ADAPTERS: dict[str, type[EngineAdapter]] = {
+    "atom": ATOMAdapter,
     "dynamo": DynamoAdapter,
+    "sglang": SGLangAdapter,
+    "trtllm": TRTLLMAdapter,
     "vllm": VLLMAdapter,
 }
 

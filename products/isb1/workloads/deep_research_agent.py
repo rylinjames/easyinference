@@ -272,6 +272,37 @@ class DeepResearchAgentGenerator(WorkloadGenerator):
 
         return requests[:num_requests]
 
+    def _prune_messages_for_window(self, messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Keep the system prompt, latest user summary/query, and recent full turn groups."""
+        if len(messages) <= 2:
+            return list(messages)
+
+        system_message = messages[0]
+        head_messages = [msg for msg in messages[1:] if msg.get("role") == "user"][:1]
+        turn_groups: list[list[dict[str, Any]]] = []
+        current_group: list[dict[str, Any]] = []
+
+        for msg in messages[1:]:
+            role = msg.get("role")
+            if role == "assistant" and current_group:
+                turn_groups.append(current_group)
+                current_group = [msg]
+            elif role in {"assistant", "tool", "user"}:
+                current_group.append(msg)
+            else:
+                if current_group:
+                    turn_groups.append(current_group)
+                    current_group = []
+                head_messages.append(msg)
+
+        if current_group:
+            turn_groups.append(current_group)
+
+        pruned: list[dict[str, Any]] = [system_message, *head_messages]
+        for group in turn_groups[-self.rolling_window_size:]:
+            pruned.extend(group)
+        return pruned
+
     def _generate_session(self) -> list[Request]:
         """Create a single long-running research session."""
         num_turns = int(self.rng.integers(self.min_turns, self.max_turns + 1))
@@ -283,13 +314,17 @@ class DeepResearchAgentGenerator(WorkloadGenerator):
         # Track tool results for rolling window
         tool_results: list[dict[str, Any]] = []
         requests: list[Request] = []
+        restart_cooldown = False
 
         # Initial research query
         messages.append({"role": "user", "content": self._pick_research_query()})
 
         for turn in range(num_turns):
+            session_restarted = False
             # Check for session restart with summary
             if (
+                not restart_cooldown
+                and
                 turn > 10
                 and float(self.rng.random()) < self.retry_with_summary_prob
             ):
@@ -299,24 +334,14 @@ class DeepResearchAgentGenerator(WorkloadGenerator):
                     {"role": "user", "content": summary},
                 ]
                 tool_results = []
+                session_restarted = True
+                restart_cooldown = True
+            else:
+                restart_cooldown = False
 
             # Apply rolling window: keep only last N tool results in context
             if len(tool_results) > self.rolling_window_size:
-                # Replace old tool results with a compact summary
-                excess = len(tool_results) - self.rolling_window_size
-                # Remove the oldest tool result messages from the conversation
-                # (messages list has system + user + pairs of assistant/tool messages)
-                messages_to_keep = [messages[0]]  # system prompt
-                # Keep non-tool messages and recent tool messages
-                tool_msg_count = 0
-                for msg in reversed(messages[1:]):
-                    if msg.get("role") == "tool":
-                        tool_msg_count += 1
-                        if tool_msg_count <= self.rolling_window_size * 2:
-                            messages_to_keep.insert(1, msg)
-                    else:
-                        messages_to_keep.insert(1, msg)
-                messages = messages_to_keep
+                messages = self._prune_messages_for_window(messages)
                 tool_results = tool_results[-self.rolling_window_size:]
 
             # Estimate context size (ramp then plateau)
@@ -339,7 +364,7 @@ class DeepResearchAgentGenerator(WorkloadGenerator):
                         "turn": turn,
                         "estimated_context_tokens": estimated_context,
                         "rolling_window_size": len(tool_results),
-                        "session_restart": False,
+                        "session_restart": session_restarted,
                     },
                 )
             )
@@ -355,7 +380,9 @@ class DeepResearchAgentGenerator(WorkloadGenerator):
 
             # Follow-up user message for next turn
             if turn < num_turns - 1:
-                if turn % 5 == 4:
+                if session_restarted:
+                    messages.append({"role": "user", "content": "Continue from the summary and keep investigating the highest-value open thread."})
+                elif turn % 5 == 4:
                     messages.append({"role": "user", "content": "Continue investigating. What else should we check?"})
                 else:
                     messages.append({"role": "user", "content": "Good, keep going."})

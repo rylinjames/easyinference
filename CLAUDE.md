@@ -48,7 +48,7 @@ products/
         platform_policy.py       <- Engine support tiers, platform traits
         memory_planner.py        <- Memory breakdown calculation
         validator.py             <- Pre-flight config validation
-        checks.py                <- 21 ISA-grounded audit checks
+        checks.py                <- 31 ISA-grounded audit checks
       telemetry/
         prometheus.py            <- Prometheus scraper (vLLM, SGLang, ATOM, Dynamo)
         normalizer.py            <- Cross-engine metric normalization

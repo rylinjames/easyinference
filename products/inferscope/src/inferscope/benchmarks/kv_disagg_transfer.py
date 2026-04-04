@@ -5,6 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from inferscope.benchmarks.models import ChatMessage, WorkloadPack, WorkloadRequest
+from inferscope.benchmarks.openai_replay import run_openai_replay
+
 
 @dataclass
 class TransferPoint:
@@ -52,3 +55,81 @@ class KVDisaggTransferResult:
             "warnings": self.warnings,
             "summary": self.summary,
         }
+
+
+def _build_disagg_transfer_pack(model_name: str, isl: int) -> WorkloadPack:
+    return WorkloadPack(
+        name=f"kv-disagg-transfer-{isl}",
+        description="Live KV disaggregated transfer probe",
+        workload_class="kv_disagg_transfer",
+        model=model_name,
+        concurrency=1,
+        stream=True,
+        requests=[
+            WorkloadRequest(
+                name=f"transfer-{isl}",
+                messages=[ChatMessage(role="user", content=f"Probe disaggregated transfer for a {isl}-token context.")],
+                max_tokens=64,
+                metadata={
+                    "phase": "kv_disagg_transfer",
+                    "isl": isl,
+                    "approx_context_tokens": isl,
+                },
+            )
+        ],
+    )
+
+
+async def run_kv_disagg_transfer(
+    endpoint: str,
+    model_name: str,
+    *,
+    topology: str,
+    isl_list: list[int] | None = None,
+    metrics_endpoint: str | None = None,
+    capture_metrics: bool = True,
+    client: Any | None = None,
+) -> KVDisaggTransferResult:
+    """Run a live disaggregated KV transfer probe."""
+
+    if isl_list is None:
+        isl_list = [4096, 8192, 32768]
+
+    result = KVDisaggTransferResult(
+        model_name=model_name,
+        topology=topology,
+        support_tier="live_probe",
+    )
+
+    idle_fractions: list[float] = []
+    for isl in isl_list:
+        artifact = await run_openai_replay(
+            _build_disagg_transfer_pack(model_name, isl),
+            endpoint,
+            model=model_name,
+            metrics_endpoint=metrics_endpoint,
+            capture_metrics=capture_metrics,
+            client=client,
+        )
+        metrics = (artifact.metrics_after.normalized_metrics if artifact.metrics_after else {}) or {}
+        disagg = metrics.get("disaggregation", {})
+        idle_fraction = float(disagg.get("decode_idle_fraction", 0.0) or 0.0)
+        idle_fractions.append(idle_fraction)
+        result.transfer_curve.append(
+            TransferPoint(
+                isl=isl,
+                transfer_latency_ms=disagg.get("nixl_transfer_latency_ms"),
+                transfer_bandwidth_gbps=float(disagg.get("transfer_bandwidth_gbps", 0.0) or 0.0),
+                decode_idle_fraction=idle_fraction,
+                nixl_failures=float(disagg.get("nixl_transfer_failures", 0.0) or 0.0),
+                kvbm_offload_events=float(disagg.get("kvbm_offload_d2h", 0.0) or 0.0),
+                kvbm_onboard_events=float(disagg.get("kvbm_onboard_h2d", 0.0) or 0.0),
+                confidence_kind="direct",
+            )
+        )
+
+    if idle_fractions:
+        result.avg_decode_idle_fraction = sum(idle_fractions) / len(idle_fractions)
+    result.transport_type = "nixl_rdma"
+    result.summary = f"Live disaggregated transfer probe captured {len(result.transfer_curve)} sequence lengths."
+    return result

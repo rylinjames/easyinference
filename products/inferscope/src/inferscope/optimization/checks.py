@@ -1,4 +1,4 @@
-"""21 audit checks for live inference deployments.
+"""31 audit checks for live inference deployments.
 
 Each check takes normalized metrics + deployment context and returns
 an AuditFinding if the check fires. All checks are ISA-grounded —
@@ -77,7 +77,7 @@ def run_all_checks(
     metrics: NormalizedMetrics,
     ctx: DeploymentContext,
 ) -> list[AuditFinding]:
-    """Run all 21 audit checks and return findings that fire."""
+    """Run all 31 audit checks and return findings that fire."""
     findings = []
     for check_fn in _ALL_CHECKS:
         result = check_fn(metrics, ctx)
