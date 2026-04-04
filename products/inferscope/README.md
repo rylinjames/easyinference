@@ -103,25 +103,31 @@ It does **not** aim to be:
 If you need benchmark breadth, use **ISB-1**.
 If you need deployment diagnosis, use **InferScope**.
 
-## CLI quick start
+## Quick start
+
+Use the dedicated quickstart for the fastest supported path:
+
+- [docs/QUICKSTART.md](docs/QUICKSTART.md)
+
+The short version is:
 
 ```bash
-git clone https://github.com/OCWC22/EasyInference.git
-cd EasyInference/products/inferscope
+git clone https://github.com/rylinjames/easyinference.git
+cd easyinference/products/inferscope
 uv sync --dev
 
-# inspect live runtime behavior
-uv run inferscope profile-runtime http://localhost:8000 --gpu-arch sm_100
+# inspect live runtime behavior first
+PYTHONPATH=src uv run python -m inferscope.cli profile-runtime http://localhost:8000 --gpu-arch sm_100
 
-# resolve the supported probe plan
-uv run inferscope benchmark-plan \
+# resolve the supported probe plan once profiling works
+PYTHONPATH=src uv run python -m inferscope.cli benchmark-plan \
   kimi-k2-long-context-coding \
   http://localhost:8000 \
   --gpu b200 \
   --num-gpus 8
 
 # run a production-lane probe
-uv run inferscope benchmark \
+PYTHONPATH=src uv run python -m inferscope.cli benchmark \
   kimi-k2-long-context-coding \
   http://localhost:8000 \
   --experiment dynamo-disagg-lmcache-kimi-k2 \
@@ -129,10 +135,10 @@ uv run inferscope benchmark \
   --num-gpus 8
 
 # compare artifacts
-uv run inferscope benchmark-compare before.json after.json
+PYTHONPATH=src uv run python -m inferscope.cli benchmark-compare before.json after.json
 
-# run MCP server
-uv run inferscope serve
+# run MCP server after the CLI path works
+PYTHONPATH=src uv run python -m inferscope.cli serve
 ```
 
 ## Procedural expansion
@@ -166,6 +172,7 @@ MCP intentionally rejects `context_file` because it is a local file expansion me
 ## Documentation
 
 - [ARCHITECTURE.md](ARCHITECTURE.md)
+- [docs/QUICKSTART.md](docs/QUICKSTART.md)
 - [docs/PROFILING.md](docs/PROFILING.md)
 - [docs/BENCHMARKS.md](docs/BENCHMARKS.md)
 - [docs/BENCHMARK-PLAN.md](docs/BENCHMARK-PLAN.md)

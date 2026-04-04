@@ -71,9 +71,11 @@ pytest tests/ -v --tb=short
 ```bash
 cd products/inferscope
 uv sync --dev
-uv run inferscope profile-runtime http://localhost:8000
-uv run inferscope benchmark-plan kimi-k2-long-context-coding http://localhost:8000 --gpu b200 --num-gpus 8
+PYTHONPATH=src uv run python -m inferscope.cli profile-runtime http://localhost:8000
+PYTHONPATH=src uv run python -m inferscope.cli benchmark-plan kimi-k2-long-context-coding http://localhost:8000 --gpu b200 --num-gpus 8
 ```
+
+For the full guided onboarding path, use [products/inferscope/docs/QUICKSTART.md](products/inferscope/docs/QUICKSTART.md).
 
 ## Monorepo rules
 
