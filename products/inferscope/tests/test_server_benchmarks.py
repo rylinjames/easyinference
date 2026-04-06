@@ -196,7 +196,15 @@ async def test_tool_run_benchmark_returns_observed_runtime(monkeypatch: pytest.M
 
 
 @pytest.mark.asyncio
-async def test_tool_validate_production_lane_rejects_preview_smoke_artifact(tmp_path) -> None:
+async def test_tool_validate_production_lane_rejects_preview_smoke_artifact(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The MCP artifact sandbox rejects paths outside settings.benchmark_dir
+    # (SSRF/path-traversal defense). Point the sandbox at tmp_path so the
+    # test artifact is reachable through the MCP tool.
+    from inferscope.config import settings
+    monkeypatch.setattr(settings, "benchmark_dir", tmp_path)
+
     artifact = BenchmarkArtifact(
         pack_name="coding-smoke",
         workload_class="coding",

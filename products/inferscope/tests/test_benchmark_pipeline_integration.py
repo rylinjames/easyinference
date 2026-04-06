@@ -75,15 +75,16 @@ async def test_mcp_pipeline_runs_benchmarks_and_compares_saved_artifacts(
     mcp = FastMCP("test-benchmark-pipeline")
     register_benchmark_tools(mcp)
 
+    # coding-smoke ships with 2 built-in requests and is not in
+    # SUPPORTED_PROCEDURAL_WORKLOADS, so procedural expansion options
+    # must not be passed here — the 2 built-in requests satisfy the
+    # `succeeded == 2` assertion below.
     common_args = {
         "workload": "coding-smoke",
         "gpu": "h100",
         "num_gpus": 1,
         "capture_metrics": False,
         "save_artifact": True,
-        "synthetic_requests": 2,
-        "synthetic_input_tokens": 512,
-        "synthetic_output_tokens": 64,
     }
 
     baseline_result = await mcp.call_tool(

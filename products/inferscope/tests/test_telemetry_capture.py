@@ -52,7 +52,9 @@ def _make_dynamo_scrape() -> ScrapeResult:
 
 @pytest.mark.asyncio
 async def test_capture_endpoint_snapshot_preserves_benchmark_schema(monkeypatch: pytest.MonkeyPatch) -> None:
-    async def fake_scrape_metrics(endpoint: str, allow_private: bool = True, auth=None) -> ScrapeResult:
+    async def fake_scrape_metrics(
+        endpoint: str, allow_private: bool = True, auth=None, **_kwargs
+    ) -> ScrapeResult:
         del endpoint, allow_private, auth
         return _make_scrape()
 
@@ -72,7 +74,9 @@ async def test_capture_endpoint_snapshot_preserves_benchmark_schema(monkeypatch:
 async def test_capture_endpoint_snapshot_appends_expected_engine_mismatch(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    async def fake_scrape_metrics(endpoint: str, allow_private: bool = True, auth=None) -> ScrapeResult:
+    async def fake_scrape_metrics(
+        endpoint: str, allow_private: bool = True, auth=None, **_kwargs
+    ) -> ScrapeResult:
         del endpoint, allow_private, auth
         return _make_scrape(engine="vllm")
 
@@ -97,6 +101,7 @@ async def test_capture_metrics_targets_preserves_declared_order(monkeypatch: pyt
         expected_engine: str | None = None,
         metrics_auth=None,
         include_samples: bool = True,
+        **_kwargs,
     ):
         del endpoint, allow_private, expected_engine, metrics_auth, include_samples
         return SimpleNamespace(target_name=target_name, target_role=target_role)
@@ -115,7 +120,9 @@ async def test_capture_metrics_targets_preserves_declared_order(monkeypatch: pyt
 
 @pytest.mark.asyncio
 async def test_capture_endpoint_snapshot_normalizes_dynamo_metrics(monkeypatch: pytest.MonkeyPatch) -> None:
-    async def fake_scrape_metrics(endpoint: str, allow_private: bool = True, auth=None) -> ScrapeResult:
+    async def fake_scrape_metrics(
+        endpoint: str, allow_private: bool = True, auth=None, **_kwargs
+    ) -> ScrapeResult:
         del endpoint, allow_private, auth
         return _make_dynamo_scrape()
 

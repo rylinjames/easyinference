@@ -185,9 +185,14 @@ def test_cli_benchmark_plan_rejection_is_actionable() -> None:
     )
 
     assert result.exit_code != 0
-    assert "not supported for the current InferScope lane" in result.output
-    assert "Workaround:" in result.output
-    assert "QUICKSTART.md" in result.output
+    # Rich wraps the error panel to the terminal width, inserting newlines
+    # and box-drawing border glyphs (U+2500..U+257F) that split phrases.
+    # Strip box glyphs and collapse whitespace before substring matching.
+    stripped = "".join(" " if 0x2500 <= ord(ch) <= 0x257F else ch for ch in result.output)
+    flat_output = " ".join(stripped.split())
+    assert "not supported for the current InferScope lane" in flat_output
+    assert "Workaround:" in flat_output
+    assert "QUICKSTART.md" in flat_output
 
 
 def test_cli_benchmark_command_reports_production_readiness(

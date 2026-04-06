@@ -299,17 +299,9 @@ def resolve_probe_plan(
     workload_pack = input_workload_pack
     selected_model_name = experiment_spec.model or workload_pack.model or SUPPORTED_MODEL
     topology_mode = experiment_spec.topology.mode
-    preflight_validation = validate_benchmark_preflight(
-        model_name=selected_model_name,
-        gpu_name=gpu,
-        num_gpus=num_gpus,
-        engine_name=experiment_spec.engine,
-        topology_mode=topology_mode,
-        model_artifact_path=model_artifact_path,
-        artifact_manifest=artifact_manifest,
-    )
-    if not preflight_validation.valid:
-        raise ProbeResolutionError("; ".join(preflight_validation.errors))
+    # Lane contract check runs first so users hit the actionable
+    # "not supported for the current InferScope lane" message before any
+    # hardware-fit math that would reject the GPU for a different reason.
     if strict_support:
         production_errors = validate_production_target(
             model_name=selected_model_name,
@@ -321,6 +313,20 @@ def resolve_probe_plan(
         )
         if production_errors:
             raise ProductionTargetValidationError(production_errors)
+    preflight_validation = validate_benchmark_preflight(
+        model_name=selected_model_name,
+        gpu_name=gpu,
+        num_gpus=num_gpus,
+        engine_name=experiment_spec.engine,
+        topology_mode=topology_mode,
+        model_artifact_path=model_artifact_path,
+        artifact_manifest=artifact_manifest,
+    )
+    # In non-strict mode, preflight failures are surfaced through
+    # `run_plan.preflight_validation` (and the support profile below)
+    # rather than raised, so preview-GPU exploration still returns a plan.
+    if strict_support and not preflight_validation.valid:
+        raise ProbeResolutionError("; ".join(preflight_validation.errors))
 
     support = assess_benchmark_support(
         model_name=selected_model_name,

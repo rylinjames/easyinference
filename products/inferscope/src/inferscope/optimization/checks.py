@@ -95,18 +95,29 @@ def run_all_checks(
 
 
 def _check_kv_preemption_storm(m: NormalizedMetrics, ctx: DeploymentContext) -> AuditFinding | None:
-    """#3: KV_PREEMPTION_STORM — preemptions indicate KV cache thrashing."""
-    if m.preemptions_total > 10:  # Any significant preemptions in the counter
+    """#3: KV_PREEMPTION_STORM — preemptions indicate KV cache thrashing.
+
+    `preemptions_total` is a monotonic Prometheus counter, so comparing it
+    against a raw threshold false-positives on any long-running deployment.
+    Instead, compare against the successful-request counter to get a rate —
+    the same pattern `normalizer.py:_compute_goodput` already uses.
+    """
+    if m.request_success_total <= 0 or m.preemptions_total <= 0:
+        return None
+    preemption_rate = m.preemptions_total / m.request_success_total
+    if preemption_rate > 0.02:
         return AuditFinding(
             check_id="KV_PREEMPTION_STORM",
             severity="critical",
             title="KV cache preemption storm detected",
             description=(
-                f"{m.preemptions_total:.0f} preemptions recorded. Requests are being evicted "
-                "from KV cache under memory pressure, causing recomputation and latency spikes."
+                f"Preemption rate is {preemption_rate:.1%} "
+                f"({m.preemptions_total:.0f} preemptions across {m.request_success_total:.0f} "
+                "successful requests). Requests are being evicted from KV cache under memory "
+                "pressure, causing recomputation and latency spikes."
             ),
-            current_value=f"{m.preemptions_total:.0f} preemptions",
-            recommended_value="0 preemptions",
+            current_value=f"{preemption_rate:.1%} preemption rate",
+            recommended_value="<1% preemption rate",
             fix_command=(
                 "Lower gpu_memory_utilization by 2-3 points, reduce max_model_len, or add replicas to spread load"
             ),
@@ -582,10 +593,15 @@ def _check_prefill_starvation(m: NormalizedMetrics, ctx: DeploymentContext) -> A
 
 
 def _check_pcie_offload_thrash(m: NormalizedMetrics, ctx: DeploymentContext) -> AuditFinding | None:
-    """PCIE_OFFLOAD_THRASH — KV offloading during active decode causes PCIe bottleneck."""
+    """PCIE_OFFLOAD_THRASH — KV offloading during active decode causes PCIe bottleneck.
+    Gated on preemption rate rather than a raw counter so long-running
+    deployments with healthy CPU offload don't false-positive."""
+    if m.request_success_total <= 0 or m.preemptions_total <= 0:
+        return None
+    preemption_rate = m.preemptions_total / m.request_success_total
     if (
         m.cpu_cache_usage > 0.1
-        and m.preemptions_total > 5
+        and preemption_rate > 0.01
         and m.requests_running > 10
         and m.itl_avg_s is not None
         and m.itl_avg_s > 0.08
@@ -595,13 +611,13 @@ def _check_pcie_offload_thrash(m: NormalizedMetrics, ctx: DeploymentContext) -> 
             severity="critical",
             title="PCIe offload thrashing during active decode",
             description=(
-                f"CPU cache is active ({m.cpu_cache_usage:.0%}), preemptions are occurring "
-                f"({m.preemptions_total:.0f}), and ITL is elevated ({m.itl_avg_s * 1000:.0f}ms) "
+                f"CPU cache is active ({m.cpu_cache_usage:.0%}), preemption rate is "
+                f"{preemption_rate:.1%}, and ITL is elevated ({m.itl_avg_s * 1000:.0f}ms) "
                 f"with {m.requests_running:.0f} running sequences. KV blocks are being shuttled "
                 "between GPU and CPU during decode — PCIe transfer dominates latency."
             ),
             current_value=(
-                f"CPU cache {m.cpu_cache_usage:.0%}, {m.preemptions_total:.0f} preemptions, "
+                f"CPU cache {m.cpu_cache_usage:.0%}, {preemption_rate:.1%} preemption rate, "
                 f"ITL {m.itl_avg_s * 1000:.0f}ms"
             ),
             recommended_value="Disable offload during active decode or offload only cold sessions",
@@ -640,20 +656,26 @@ def _check_gpu_underutilization(m: NormalizedMetrics, ctx: DeploymentContext) ->
 
 
 def _check_oom_despite_free(m: NormalizedMetrics, ctx: DeploymentContext) -> AuditFinding | None:
-    """OOM_DESPITE_FREE — preemptions happening despite available KV cache (fragmentation-induced OOM)."""
-    if m.preemptions_total > 5 and m.kv_cache_usage < 0.8:
+    """OOM_DESPITE_FREE — preemptions happening despite available KV cache
+    (fragmentation-induced OOM). Uses a preemption rate rather than a raw
+    counter so long-running deployments don't false-positive."""
+    if m.request_success_total <= 0 or m.preemptions_total <= 0:
+        return None
+    preemption_rate = m.preemptions_total / m.request_success_total
+    if preemption_rate > 0.01 and m.kv_cache_usage < 0.8:
         return AuditFinding(
             check_id="OOM_DESPITE_FREE",
             severity="critical",
             title="Preemptions despite available KV cache — fragmentation OOM",
             description=(
-                f"{m.preemptions_total:.0f} preemptions recorded but KV cache is only at "
-                f"{m.kv_cache_usage:.0%}. This indicates internal block fragmentation — "
+                f"Preemption rate is {preemption_rate:.1%} "
+                f"({m.preemptions_total:.0f}/{m.request_success_total:.0f}) but KV cache is "
+                f"only at {m.kv_cache_usage:.0%}. This indicates internal block fragmentation — "
                 "the allocator cannot find contiguous blocks despite free memory. "
                 "This is a known PagedAttention failure mode under mixed workloads."
             ),
-            current_value=f"{m.preemptions_total:.0f} preemptions at {m.kv_cache_usage:.0%} KV",
-            recommended_value="0 preemptions with proper block management",
+            current_value=f"{preemption_rate:.1%} preemption rate at {m.kv_cache_usage:.0%} KV",
+            recommended_value="<0.5% preemption rate with proper block management",
             fix_command=(
                 "Enable fragmentation monitoring, lower kv_compaction_trigger, "
                 "separate long/short context queues, or restart to reset allocator"
@@ -848,19 +870,29 @@ def _check_grove_eviction_storm(m: NormalizedMetrics, ctx: DeploymentContext) ->
 
     Grounded in inferencebreakpoints/07-kv-cache/eviction-policies:
     High eviction rates indicate the working set exceeds all tier capacity.
+
+    Like the preemption-based checks, `grove_evictions` is a monotonic
+    counter. Compare it against successful requests to get a rate so
+    long-running deployments don't false-positive on accumulated eviction
+    counts from normal steady-state behavior.
     """
-    if m.grove_evictions > 100 and m.grove_tier_gpu_pct > 0.85:
+    if m.request_success_total <= 0 or m.grove_evictions <= 0:
+        return None
+    eviction_rate = m.grove_evictions / m.request_success_total
+    if eviction_rate > 0.02 and m.grove_tier_gpu_pct > 0.85:
         return AuditFinding(
             check_id="GROVE_EVICTION_STORM",
             severity="warning",
             title="Grove eviction storm — KV tiering capacity exhausted",
             description=(
-                f"{m.grove_evictions:.0f} Grove evictions with GPU tier at {m.grove_tier_gpu_pct:.0%}. "
-                "The KV working set exceeds tiered cache capacity. Sessions are being evicted "
-                "rather than demoted, causing recomputation on subsequent requests."
+                f"Grove eviction rate is {eviction_rate:.1%} "
+                f"({m.grove_evictions:.0f}/{m.request_success_total:.0f}) with GPU tier at "
+                f"{m.grove_tier_gpu_pct:.0%}. The KV working set exceeds tiered cache capacity. "
+                "Sessions are being evicted rather than demoted, causing recomputation on "
+                "subsequent requests."
             ),
-            current_value=f"{m.grove_evictions:.0f} evictions, GPU tier at {m.grove_tier_gpu_pct:.0%}",
-            recommended_value="<10 evictions/min with headroom in at least one tier",
+            current_value=f"{eviction_rate:.1%} eviction rate, GPU tier at {m.grove_tier_gpu_pct:.0%}",
+            recommended_value="<1% eviction rate with headroom in at least one tier",
             fix_command=(
                 "Increase CPU DRAM or NVMe tier capacity, reduce concurrent sessions, "
                 "or enable aggressive KV compression before tiering"

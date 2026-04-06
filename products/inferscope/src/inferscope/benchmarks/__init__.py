@@ -22,7 +22,10 @@ from inferscope.benchmarks.experiments import (
 )
 from inferscope.benchmarks.models import (
     BenchmarkArtifact,
+    BenchmarkArtifactProvenance,
+    BenchmarkLaneReference,
     BenchmarkRequestResult,
+    BenchmarkSourceReference,
     BenchmarkSummary,
     MetricSampleRecord,
     MetricSnapshot,
@@ -49,7 +52,10 @@ from inferscope.benchmarks.support import (
 
 __all__ = [
     "BenchmarkArtifact",
+    "BenchmarkArtifactProvenance",
     "BenchmarkCacheMetadata",
+    "BenchmarkLaneReference",
+    "BenchmarkSourceReference",
     "BenchmarkExecutionProfile",
     "BenchmarkExperimentSpec",
     "BenchmarkGoodputSLO",
