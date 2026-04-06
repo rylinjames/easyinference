@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import shlex
 from typing import Any
 
 from inferscope.engines.base import (
@@ -58,19 +60,20 @@ class TRTLLMCompiler(ConfigCompiler):
             cfg.notes.append("Using TRT-LLM 1.1+ KV Cache Connector for disaggregated serving")
 
         # --- Build command string ---
+        # Use shlex.quote so dict-valued flags (serialised to JSON) cannot
+        # break shell parsing if they contain single quotes. See the
+        # equivalent fix in engines/vllm.py.
         cmd_parts = ["trtllm-serve", "serve"]
         for k, v in cfg.cli_flags.items():
             if isinstance(v, bool):
                 if v:
                     cmd_parts.append(f"--{k}")
             elif isinstance(v, dict):
-                import json
-
                 cmd_parts.append(f"--{k}")
-                cmd_parts.append(f"'{json.dumps(v)}'")
+                cmd_parts.append(shlex.quote(json.dumps(v)))
             else:
                 cmd_parts.append(f"--{k}")
-                cmd_parts.append(str(v))
+                cmd_parts.append(shlex.quote(str(v)))
         cfg.command = " \\\n  ".join(cmd_parts)
 
         return cfg

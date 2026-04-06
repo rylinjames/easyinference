@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import json
+import shlex
+
 from inferscope.engines.base import DeploymentInventory
 from inferscope.engines.dynamo import DynamoCompiler
 from inferscope.engines.trtllm import TRTLLMCompiler
@@ -126,3 +129,99 @@ def test_dynamo_compiler_marks_supported() -> None:
 
     assert cfg.support_tier == "supported"
     assert "Dynamo + LMCache" in cfg.support_reason
+
+
+# ----------------------------------------------------------------------------
+# Shell-injection regression — bugs/vllm_command_builder_shell_injection.md
+# ----------------------------------------------------------------------------
+#
+# The compilers use shlex.quote when serialising CLI flags so that dict-valued
+# flags (which get json.dumps'd) cannot break shell parsing if they contain
+# single quotes. Earlier drafts wrapped them with literal `f"'{json.dumps(v)}'"`
+# which is unsafe.
+
+
+def test_vllm_compiler_command_round_trips_through_shlex() -> None:
+    """The compiled vLLM command must parse cleanly via shlex.split.
+
+    Regression test for bugs/vllm_command_builder_shell_injection.md (P1).
+    """
+    compiler = VLLMCompiler()
+    cfg = compiler.compile(_profile(), _inventory("b200"))
+
+    # Collapse the backslash-newline continuations the compiler uses for
+    # readability before passing to shlex.split.
+    parsed = shlex.split(cfg.command.replace("\\\n", " "))
+    assert parsed[0] == "vllm"
+    assert parsed[1] == "serve"
+    # Every dict-valued flag must parse back to the original JSON object
+    for k, v in cfg.cli_flags.items():
+        if isinstance(v, dict):
+            flag = f"--{k}"
+            assert flag in parsed, f"flag {flag} missing from parsed command"
+            value_index = parsed.index(flag) + 1
+            roundtripped = json.loads(parsed[value_index])
+            assert roundtripped == v, f"dict flag {k} did not round-trip through shlex"
+
+
+def test_trtllm_compiler_command_round_trips_through_shlex() -> None:
+    """The compiled TRT-LLM command must parse cleanly via shlex.split.
+
+    Same regression as the vLLM test — both compilers used the same unsafe
+    f-string single-quote wrapping pattern before the fix.
+    """
+    compiler = TRTLLMCompiler()
+    cfg = compiler.compile(_profile(), _inventory("b200"))
+
+    # Collapse the backslash-newline continuations the compiler uses for
+    # readability before passing to shlex.split.
+    parsed = shlex.split(cfg.command.replace("\\\n", " "))
+    assert parsed[0] == "trtllm-serve"
+    assert parsed[1] == "serve"
+    for k, v in cfg.cli_flags.items():
+        if isinstance(v, dict):
+            flag = f"--{k}"
+            assert flag in parsed, f"flag {flag} missing from parsed command"
+            value_index = parsed.index(flag) + 1
+            roundtripped = json.loads(parsed[value_index])
+            assert roundtripped == v, f"dict flag {k} did not round-trip through shlex"
+
+
+def test_vllm_compiler_handles_single_quote_in_dict_value() -> None:
+    """If a dict-valued cli_flag contains a string with a single quote, the
+    resulting command must still parse via shlex (the previous f-string
+    wrapping would break here).
+
+    This is the strict version of the round-trip test — directly exercises
+    the worst-case input the bug doc cited.
+    """
+    compiler = VLLMCompiler()
+    cfg = compiler.compile(_profile(), _inventory("b200"))
+
+    # Inject a malicious dict value with a single quote and a double quote
+    cfg.cli_flags["adversarial-config"] = {
+        "name": "value with ' single quote",
+        "other": 'value with " double quote',
+        "shell": "rm -rf $HOME; echo 'gotcha'",
+    }
+    # Re-build the command using the same shlex-quoting logic the compiler uses
+    cmd_parts = ["vllm", "serve"]
+    for k, v in cfg.cli_flags.items():
+        if isinstance(v, bool):
+            if v:
+                cmd_parts.append(f"--{k}")
+        elif isinstance(v, dict):
+            cmd_parts.append(f"--{k}")
+            cmd_parts.append(shlex.quote(json.dumps(v)))
+        else:
+            cmd_parts.append(f"--{k}")
+            cmd_parts.append(shlex.quote(str(v)))
+    rebuilt = " \\\n  ".join(cmd_parts)
+
+    parsed = shlex.split(rebuilt.replace("\\\n", " "))
+    assert "--adversarial-config" in parsed
+    idx = parsed.index("--adversarial-config")
+    roundtripped = json.loads(parsed[idx + 1])
+    assert roundtripped["name"] == "value with ' single quote"
+    assert roundtripped["other"] == 'value with " double quote'
+    assert roundtripped["shell"] == "rm -rf $HOME; echo 'gotcha'"

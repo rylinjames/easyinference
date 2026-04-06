@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import shlex
 from typing import Any, cast
 
 import httpx
@@ -333,6 +334,11 @@ class VLLMCompiler(ConfigCompiler):
             )
 
         # --- Build command string ---
+        # Use shlex.quote for any value that may contain shell-special characters
+        # (notably: dict values serialised to JSON, which can include single quotes
+        # inside string fields). Previously dict values were wrapped with literal
+        # f"'{json.dumps(v)}'" which is unsafe — a JSON string containing a single
+        # quote breaks the wrapping. shlex.quote produces a shell-safe quoted form.
         cmd_parts = ["vllm", "serve"]
         for k, v in cfg.cli_flags.items():
             if isinstance(v, bool):
@@ -340,10 +346,10 @@ class VLLMCompiler(ConfigCompiler):
                     cmd_parts.append(f"--{k}")
             elif isinstance(v, dict):
                 cmd_parts.append(f"--{k}")
-                cmd_parts.append(f"'{json.dumps(v)}'")
+                cmd_parts.append(shlex.quote(json.dumps(v)))
             else:
                 cmd_parts.append(f"--{k}")
-                cmd_parts.append(str(v))
+                cmd_parts.append(shlex.quote(str(v)))
         cfg.command = " \\\n  ".join(cmd_parts)
 
         return cfg
