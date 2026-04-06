@@ -91,21 +91,25 @@ dynamo_component_inflight_requests{dynamo_namespace="default",dynamo_component="
 # TYPE dynamo_component_requests_total counter
 dynamo_component_requests_total{dynamo_namespace="default",dynamo_component="worker",dynamo_endpoint="generate"} 10000
 
-# HELP dynamo_component_kvstats_active_blocks Active KV blocks
-# TYPE dynamo_component_kvstats_active_blocks gauge
-dynamo_component_kvstats_active_blocks{dynamo_component="worker"} 8100
+# HELP dynamo_component_active_blocks Active KV blocks
+# TYPE dynamo_component_active_blocks gauge
+dynamo_component_active_blocks{dynamo_component="worker"} 8100
 
-# HELP dynamo_component_kvstats_total_blocks Total KV blocks
-# TYPE dynamo_component_kvstats_total_blocks gauge
-dynamo_component_kvstats_total_blocks{dynamo_component="worker"} 16384
+# HELP dynamo_component_total_blocks Total KV blocks
+# TYPE dynamo_component_total_blocks gauge
+dynamo_component_total_blocks{dynamo_component="worker"} 16384
 
-# HELP dynamo_component_kvstats_gpu_cache_usage_percent GPU KV cache usage
-# TYPE dynamo_component_kvstats_gpu_cache_usage_percent gauge
-dynamo_component_kvstats_gpu_cache_usage_percent{dynamo_component="worker"} 0.50
+# HELP dynamo_component_gpu_cache_usage_percent GPU KV cache usage
+# TYPE dynamo_component_gpu_cache_usage_percent gauge
+dynamo_component_gpu_cache_usage_percent{dynamo_component="worker"} 0.50
 
-# HELP dynamo_component_kvstats_gpu_prefix_cache_hit_rate GPU prefix cache hit rate
-# TYPE dynamo_component_kvstats_gpu_prefix_cache_hit_rate gauge
-dynamo_component_kvstats_gpu_prefix_cache_hit_rate{dynamo_component="worker"} 0.72
+# HELP dynamo_component_gpu_prefix_cache_hit_rate GPU prefix cache hit rate
+# TYPE dynamo_component_gpu_prefix_cache_hit_rate gauge
+dynamo_component_gpu_prefix_cache_hit_rate{dynamo_component="worker"} 0.72
+
+# HELP dynamo_component_errors_total Total backend errors
+# TYPE dynamo_component_errors_total counter
+dynamo_component_errors_total{dynamo_namespace="default",dynamo_component="worker",dynamo_endpoint="generate"} 5
 
 # HELP dynamo_component_kv_cache_events_applied KV cache event counter
 # TYPE dynamo_component_kv_cache_events_applied counter

@@ -126,10 +126,11 @@ def test_fixture_parses_all_expected_metric_families() -> None:
         "dynamo_frontend_model_total_kv_blocks",
         "dynamo_frontend_model_max_num_seqs",
         "dynamo_frontend_model_context_length",
-        "dynamo_component_kvstats_active_blocks",
-        "dynamo_component_kvstats_total_blocks",
-        "dynamo_component_kvstats_gpu_cache_usage_percent",
-        "dynamo_component_kvstats_gpu_prefix_cache_hit_rate",
+        "dynamo_component_active_blocks",
+        "dynamo_component_total_blocks",
+        "dynamo_component_gpu_cache_usage_percent",
+        "dynamo_component_gpu_prefix_cache_hit_rate",
+        "dynamo_component_errors_total",
         "dynamo_component_kv_cache_events_applied",
         "dynamo_router_overhead_total_ms_sum",
         "dynamo_router_overhead_block_hashing_ms_sum",
@@ -293,7 +294,7 @@ def test_preemption_rate_spike_fires_kv_preemption_storm() -> None:
 def test_kv_cache_critical_fires_when_cache_hot() -> None:
     """Overlay: GPU KV cache jumps to 97%. → KV_CACHE_CRITICAL fires."""
     scrape = _load_healthy_fixture()
-    scrape.raw_metrics["dynamo_component_kvstats_gpu_cache_usage_percent"] = 0.97
+    scrape.raw_metrics["dynamo_component_gpu_cache_usage_percent"] = 0.97
     m = normalize(scrape)
     findings = run_all_checks(m, _healthy_ctx())
     ids = {f.check_id for f in findings}

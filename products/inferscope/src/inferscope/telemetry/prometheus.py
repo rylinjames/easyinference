@@ -116,10 +116,18 @@ DYNAMO_METRICS = {
     "dynamo_component_inflight_requests": "Requests currently processed by a backend component",
     "dynamo_component_request_duration_seconds": "Backend component request duration",
     "dynamo_component_requests_total": "Total requests processed by a backend component",
-    "dynamo_component_kvstats_active_blocks": "Active KV blocks on the worker",
-    "dynamo_component_kvstats_total_blocks": "Total KV blocks on the worker",
-    "dynamo_component_kvstats_gpu_cache_usage_percent": "Worker GPU KV cache utilization",
-    "dynamo_component_kvstats_gpu_prefix_cache_hit_rate": "Worker GPU prefix cache hit rate",
+    # KV-stats metrics emitted by the worker/router. Note: there is NO
+    # `kvstats` segment in the real metric names. The bare constants in
+    # the Dynamo source (lib/runtime/src/metrics/prometheus_names.rs)
+    # are `active_blocks`, `total_blocks`, `gpu_cache_usage_percent`,
+    # and `gpu_prefix_cache_hit_rate`; they get the `dynamo_component_`
+    # prefix at registration time. Verified against the live PromQL
+    # queries in deploy/observability/grafana_dashboards/disagg-dashboard.json.
+    "dynamo_component_active_blocks": "Active KV blocks on the worker",
+    "dynamo_component_total_blocks": "Total KV blocks on the worker",
+    "dynamo_component_gpu_cache_usage_percent": "Worker GPU KV cache utilization",
+    "dynamo_component_gpu_prefix_cache_hit_rate": "Worker GPU prefix cache hit rate",
+    "dynamo_component_errors_total": "Total backend component errors",
     "dynamo_component_kv_cache_events_applied": "Count of KV cache events applied by the router",
     # --- Backend component-router histograms (Dynamo mirrors router metrics ---
     # --- on the component side for per-worker attribution)                 ---

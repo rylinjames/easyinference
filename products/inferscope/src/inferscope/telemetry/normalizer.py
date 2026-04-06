@@ -33,6 +33,7 @@ class NormalizedMetrics:
     generation_tokens_total: float = 0.0
     preemptions_total: float = 0.0
     request_success_total: float = 0.0
+    errors_total: float = 0.0  # backend component errors (Dynamo)
 
     # Latency (histogram averages in seconds)
     ttft_avg_s: float | None = None  # Time to first token
@@ -142,6 +143,7 @@ class NormalizedMetrics:
                 "disconnected_clients": self.disconnected_clients,
                 "kv_active_blocks": self.kv_active_blocks,
                 "kv_total_blocks": self.kv_total_blocks,
+                "errors_total": self.errors_total,
             },
             "disaggregation": {
                 "kvbm_offload_d2h": self.kvbm_offload_d2h,
@@ -334,10 +336,14 @@ def normalize(scrape: ScrapeResult) -> NormalizedMetrics:
             "dynamo_component_inflight_requests"
         )
         m.requests_waiting = scrape.get("dynamo_frontend_queued_requests")
-        m.kv_cache_usage = scrape.get("dynamo_component_kvstats_gpu_cache_usage_percent") or scrape.get(
+        # There is no `kvstats` segment in real Dynamo metric names; the
+        # registration prefix is just `dynamo_component_`. Verified against
+        # the live disagg-dashboard.json PromQL queries and the bare
+        # constants in lib/runtime/src/metrics/prometheus_names.rs.
+        m.kv_cache_usage = scrape.get("dynamo_component_gpu_cache_usage_percent") or scrape.get(
             "vllm:gpu_cache_usage_perc"
         )
-        m.prefix_cache_hit_rate = scrape.get("dynamo_component_kvstats_gpu_prefix_cache_hit_rate") or scrape.get(
+        m.prefix_cache_hit_rate = scrape.get("dynamo_component_gpu_prefix_cache_hit_rate") or scrape.get(
             "vllm:gpu_prefix_cache_hit_rate"
         )
         m.prompt_tokens_total = scrape.get("vllm:prompt_tokens_total")
@@ -347,6 +353,7 @@ def normalize(scrape: ScrapeResult) -> NormalizedMetrics:
         m.request_success_total = scrape.get("dynamo_frontend_requests_total") or scrape.get(
             "dynamo_component_requests_total"
         )
+        m.errors_total = scrape.get("dynamo_component_errors_total")
         m.ttft_avg_s = scrape.get_histogram_avg(
             "dynamo_frontend_time_to_first_token_seconds"
         ) or scrape.get_histogram_avg("vllm:time_to_first_token_seconds")
@@ -358,8 +365,8 @@ def normalize(scrape: ScrapeResult) -> NormalizedMetrics:
         )
         m.request_migrations_total = scrape.get("dynamo_frontend_model_migration_total")
         m.disconnected_clients = scrape.get("dynamo_frontend_disconnected_clients")
-        m.kv_active_blocks = scrape.get("dynamo_component_kvstats_active_blocks")
-        m.kv_total_blocks = scrape.get("dynamo_component_kvstats_total_blocks")
+        m.kv_active_blocks = scrape.get("dynamo_component_active_blocks")
+        m.kv_total_blocks = scrape.get("dynamo_component_total_blocks")
         # KVBM tiering metrics — only present if the operator launched
         # Dynamo with DYN_KVBM_METRICS=true and added the KVBM /metrics
         # endpoint (port 6880 by default) to the scrape target list.
