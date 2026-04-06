@@ -108,20 +108,20 @@ DYNAMO_METRICS = {
     "dynamo_frontend_worker_last_input_sequence_tokens": "Last observed input sequence tokens per worker",
     "dynamo_frontend_worker_last_inter_token_latency_seconds": "Last observed ITL per worker",
     # --- Router-overhead histograms (values are raw ms, not seconds) ---
-    # Naming ambiguity: docs/observability/metrics.md spells these as
-    # `dynamo_router_overhead_*` but lib/runtime/src/metrics/prometheus_names.rs
-    # declares `ROUTING_OVERHEAD = "dynamo_routing_overhead"` as the namespace
-    # (note: `routing` not `router`). The two spellings disagree inside the
-    # Dynamo repo itself. We follow metrics.md because it's what the docs
-    # tell operators to expect and matches the dynamo.json dashboard naming
-    # convention for other metrics. If a real captured scrape shows
-    # `dynamo_routing_overhead_*` instead, add the alt names as fallbacks
-    # in normalizer.py and update here.
+    # Names verified at the registration site in
+    # lib/llm/src/kv_router/metrics.rs. (The `ROUTING_OVERHEAD` namespace
+    # constant in lib/runtime/src/metrics/prometheus_names.rs is an alt
+    # namespace that is not used at the kv_router emission site — the
+    # emission uses `dynamo_router_overhead_` directly.)
     "dynamo_router_overhead_block_hashing_ms": "Block hashing overhead inside the router",
     "dynamo_router_overhead_indexer_find_matches_ms": "KV indexer match-finding overhead",
     "dynamo_router_overhead_seq_hashing_ms": "Sequence hashing overhead",
     "dynamo_router_overhead_scheduling_ms": "Router scheduling overhead",
     "dynamo_router_overhead_total_ms": "Total routing overhead per request",
+    # Tokenizer latency histogram (raw ms, not seconds). Emitted by the
+    # HTTP frontend — verified at the registration site in
+    # lib/llm/src/http/service/metrics.rs.
+    "dynamo_frontend_tokenizer_latency_ms": "Per-request tokenization overhead (histogram, ms)",
     # --- Backend component metrics ---
     "dynamo_component_inflight_requests": "Requests currently processed by a backend component",
     "dynamo_component_request_duration_seconds": "Backend component request duration",
@@ -169,21 +169,34 @@ DYNAMO_METRICS = {
     "kvbm_matched_tokens": "Tokens reused from KVBM cache",
 }
 
-# NIXL TRANSFER METRICS — UNVERIFIED, NOT IN DYNAMO_METRICS.
-# NIXL is exposed on a SEPARATE Prometheus endpoint (port 19090 per
-# Dynamo's own deploy/observability/prometheus.yml scrape config) and
-# is emitted by the NIXL upstream library, NOT by Dynamo runtime. The
-# metric name schema is not in lib/runtime/src/metrics/prometheus_names.rs
-# anywhere — searching the Dynamo repo for `dynamo_nixl_` returns zero
-# results — so the earlier `dynamo_nixl_transfer_*` names this module
-# carried were invented, not sourced.
-# The NIXL_TRANSFER_DOMINATES audit check stays in the registry as
-# DORMANT: it reads the `nixl_transfer_*` fields on NormalizedMetrics,
-# which will only populate if an operator wires a NIXL scrape target
-# whose metric names we eventually add here. Adding those names requires
-# capturing a real NIXL /metrics scrape from a disaggregated Dynamo
-# deployment and recording the actual exposition format. Until that
-# happens, the dormant-by-data-absence path is the honest state.
+# KV TRANSFER LATENCY — two data sources, both in progress.
+#
+# Source 1 (preferred once merged): Dynamo's own KV router computes an
+# upper-bound KV transfer latency for disaggregated serving and exposes
+# it as `dynamo_component_router_kv_transfer_latency_seconds`
+# (histogram, 15 log-scale buckets from 1ms to 10s). This is introduced
+# in ai-dynamo/dynamo PR #7590 which is currently OPEN (not merged).
+# Once merged, the dormant NIXL_TRANSFER_DOMINATES check can be rewired
+# to read this field directly from the normal Dynamo frontend /metrics
+# scrape, no separate NIXL scrape target required. Follow the PR at:
+#   https://github.com/ai-dynamo/dynamo/pull/7590
+#
+# Source 2 (upstream NIXL library): NIXL is exposed on a SEPARATE
+# Prometheus endpoint (port 19090 per Dynamo's own
+# deploy/observability/prometheus.yml scrape config) and is emitted by
+# the NIXL upstream library, NOT by Dynamo runtime. The metric name
+# schema is not documented in the Dynamo repo — searching it for
+# `dynamo_nixl_` returns zero results — so the earlier
+# `dynamo_nixl_transfer_*` names this module carried were invented.
+# If an operator specifically needs to monitor NIXL independently of
+# Dynamo's router-computed upper bound, they'd need to capture a real
+# NIXL /metrics scrape from the :19090 endpoint and add the real
+# metric names here.
+#
+# Both sources feed the `nixl_transfer_latency_s` field on
+# NormalizedMetrics. Until one of them is wired in, the dormant
+# NIXL_TRANSFER_DOMINATES check stays silent on a clean deployment —
+# the correct no-finding outcome when there's no data to judge.
 
 LMCACHE_METRICS: dict[str, str] = {
     "lmcache:num_hit_tokens_total": "Total tokens found in LMCache",

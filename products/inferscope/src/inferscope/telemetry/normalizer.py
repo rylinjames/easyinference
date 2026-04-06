@@ -96,6 +96,12 @@ class NormalizedMetrics:
     # reliable than hit_rate for coding workloads.
     cached_tokens_avg: float | None = None
 
+    # Frontend tokenizer latency histogram average (milliseconds).
+    # Useful for TTFT decomposition — if tokenizer_latency is a large
+    # fraction of TTFT, the bottleneck is on the CPU pre-processing
+    # path, not the GPU prefill path.
+    tokenizer_latency_ms: float | None = None
+
     # KV cache event counter (applied events for the kv-aware router).
     kv_cache_events_applied: float = 0.0
 
@@ -202,6 +208,11 @@ class NormalizedMetrics:
                 "cached_tokens_avg": (
                     round(self.cached_tokens_avg, 1)
                     if self.cached_tokens_avg is not None
+                    else None
+                ),
+                "tokenizer_latency_ms": (
+                    round(self.tokenizer_latency_ms, 2)
+                    if self.tokenizer_latency_ms is not None
                     else None
                 ),
             },
@@ -442,6 +453,9 @@ def normalize(scrape: ScrapeResult) -> NormalizedMetrics:
 
         # Tokens-served-from-cache histogram average (per request).
         m.cached_tokens_avg = scrape.get_histogram_avg("dynamo_frontend_cached_tokens")
+
+        # Frontend tokenizer latency histogram (raw milliseconds).
+        m.tokenizer_latency_ms = scrape.get_histogram_avg("dynamo_frontend_tokenizer_latency_ms")
 
         # KV cache event counter.
         m.kv_cache_events_applied = scrape.get("dynamo_component_kv_cache_events_applied")
