@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import asyncio
-import json
 from collections.abc import Callable
 from pathlib import Path
 from typing import Annotated, Any
 
 import typer
 
+from inferscope._cli_helpers import parse_json_option as _parse_json_option
 from inferscope.benchmarks import (
     build_default_artifact_path,
     compare_benchmark_artifacts,
@@ -24,18 +24,6 @@ from inferscope.production_target import (
     build_production_contract,
     validate_production_lane_artifact,
 )
-
-
-def _parse_json_option(raw: str, *, option_name: str) -> dict[str, Any] | None:
-    if not raw.strip():
-        return None
-    try:
-        value = json.loads(raw)
-    except json.JSONDecodeError as exc:
-        raise typer.BadParameter(f"{option_name} must be valid JSON") from exc
-    if not isinstance(value, dict):
-        raise typer.BadParameter(f"{option_name} must be a JSON object")
-    return {str(key): val for key, val in value.items()}
 
 
 def register_benchmark_commands(

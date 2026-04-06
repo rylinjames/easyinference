@@ -14,23 +14,12 @@ from typing import Annotated, Any
 
 import typer
 
+from inferscope._cli_helpers import parse_json_option as _parse_json_option
 from inferscope.benchmarks import build_default_artifact_path, run_openai_replay
 from inferscope.benchmarks.probe_resolution import resolve_probe_plan
 from inferscope.endpoint_auth import parse_header_values
 from inferscope.production_target import build_benchmark_readiness_summary
 from inferscope.tools.profiling import profile_runtime
-
-
-def _parse_json_option(raw: str, *, option_name: str) -> dict[str, Any] | None:
-    if not raw.strip():
-        return None
-    try:
-        value = json.loads(raw)
-    except json.JSONDecodeError as exc:
-        raise typer.BadParameter(f"{option_name} must be valid JSON") from exc
-    if not isinstance(value, dict):
-        raise typer.BadParameter(f"{option_name} must be a JSON object")
-    return {str(key): val for key, val in value.items()}
 
 
 def _default_experiment_name() -> str:

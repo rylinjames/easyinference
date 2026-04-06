@@ -1,7 +1,9 @@
 """InferScope CLI — operator tooling for runtime profiling and narrow probe execution.
 
 Usage:
+    inferscope --version
     inferscope profile-runtime http://localhost:8000
+    inferscope --output-format json profile-runtime http://localhost:8000  # machine-readable
     inferscope benchmark-plan kimi-k2-long-context-coding http://localhost:8000 --gpu b200 --num-gpus 8
     inferscope benchmark kimi-k2-long-context-coding http://localhost:8000 --experiment dynamo-disagg-lmcache-kimi-k2
     inferscope serve  # Start MCP server (stdio)
@@ -10,6 +12,7 @@ Usage:
 from __future__ import annotations
 
 import json
+from importlib.metadata import PackageNotFoundError, version as _pkg_version
 from pathlib import Path
 
 import typer
@@ -46,9 +49,57 @@ app = typer.Typer(
 )
 console = Console()
 
+# Output mode set by the global --output-format flag.
+# "pretty" (default): rich-formatted console output via _print_result.
+# "json": raw JSON dump to stdout for piping into jq / CI consumption.
+_OUTPUT_MODE: str = "pretty"
+
+
+def _resolve_inferscope_version() -> str:
+    """Return the installed inferscope package version, or a sentinel if unknown."""
+    try:
+        return _pkg_version("inferscope")
+    except PackageNotFoundError:
+        return "unknown (package metadata not found)"
+
+
+def _version_callback(value: bool) -> None:
+    """Eager callback for the global --version flag."""
+    if value:
+        typer.echo(f"inferscope {_resolve_inferscope_version()}")
+        raise typer.Exit()
+
+
+@app.callback()
+def _global_options(
+    version: bool = typer.Option(
+        None,
+        "--version",
+        help="Show the installed InferScope version and exit.",
+        callback=_version_callback,
+        is_eager=True,
+    ),
+    output_format: str = typer.Option(
+        "pretty",
+        "--output-format",
+        help="Output format: 'pretty' (rich console, default) or 'json' (raw JSON for scripting).",
+    ),
+) -> None:
+    """Global options that apply to every subcommand."""
+    global _OUTPUT_MODE
+    if output_format not in ("pretty", "json"):
+        raise typer.BadParameter("--output-format must be 'pretty' or 'json'")
+    _OUTPUT_MODE = output_format
+
 
 def _print_result(result: dict) -> None:
-    """Pretty-print a tool result."""
+    """Pretty-print a tool result, or dump raw JSON when --output-format=json."""
+    if _OUTPUT_MODE == "json":
+        # Machine-readable mode — dump everything to stdout as one JSON document.
+        # Use typer.echo so output is unstyled and pipeable.
+        typer.echo(json.dumps(result, indent=2, default=str))
+        return
+
     summary = result.pop("summary", "")
     confidence = result.pop("confidence", None)
 

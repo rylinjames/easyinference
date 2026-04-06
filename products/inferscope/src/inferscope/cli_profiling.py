@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 import asyncio
-import json
 from collections.abc import Callable
 from typing import Annotated, Any
 
 import typer
 
+from inferscope._cli_helpers import parse_json_option as _parse_json_option
 from inferscope.tools.audit import audit_deployment
 from inferscope.tools.diagnose import (
     check_deployment,
@@ -16,18 +16,6 @@ from inferscope.tools.diagnose import (
     get_cache_effectiveness,
 )
 from inferscope.tools.profiling import profile_runtime
-
-
-def _parse_json_option(raw: str, *, option_name: str) -> dict[str, Any] | None:
-    if not raw.strip():
-        return None
-    try:
-        value = json.loads(raw)
-    except json.JSONDecodeError as exc:
-        raise typer.BadParameter(f"{option_name} must be valid JSON") from exc
-    if not isinstance(value, dict):
-        raise typer.BadParameter(f"{option_name} must be a JSON object")
-    return {str(key): val for key, val in value.items()}
 
 
 def register_profiling_commands(
