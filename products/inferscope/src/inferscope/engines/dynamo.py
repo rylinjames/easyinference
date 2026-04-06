@@ -19,23 +19,38 @@ from inferscope.production_target import is_target_gpu, is_target_model
 
 _adapter_log = get_logger(component="dynamo_adapter")
 
+# Metric prefixes a Dynamo deployment MUST expose for InferScope to
+# diagnose it. Names are taken from the authoritative Dynamo source:
+# https://github.com/ai-dynamo/dynamo/blob/main/docs/observability/metrics.md
+# and lib/runtime/src/metrics/prometheus_names.rs.
+#
+# Historical note: earlier revisions of this file used made-up prefixes
+# (`dynamo_scheduler_`, `dynamo_request_`, `dynamo_prefill_`, `dynamo_decode_`)
+# that don't appear anywhere in Dynamo. Those were removed — the real
+# separation is frontend-vs-component, plus `dynamo_router_overhead_*`
+# for routing overhead histograms. Prefill/decode roles are distinguished
+# by component labels, not by metric prefix.
 _REQUIRED_PRIMARY_PREFIXES = [
-    "dynamo_router_",
-    "dynamo_scheduler_",
-    "dynamo_request_",
+    "dynamo_frontend_",
+    "dynamo_component_",
+    "dynamo_router_overhead_",
 ]
 
 _REQUIRED_CACHE_PREFIXES = [
-    "lmcache_",
-    "dynamo_lmcache_",
+    "lmcache:",
+    "dynamo_component_kvstats_",
 ]
 
+# In disaggregated (split prefill/decode) topology, prefill and decode
+# workers are distinguished by the `dynamo_component` label value, not
+# by a dedicated metric prefix. The same `dynamo_component_*` metrics
+# appear on both roles with different label values.
 _REQUIRED_PREFILL_PREFIXES = [
-    "dynamo_prefill_",
+    "dynamo_component_",
 ]
 
 _REQUIRED_DECODE_PREFIXES = [
-    "dynamo_decode_",
+    "dynamo_component_",
 ]
 
 

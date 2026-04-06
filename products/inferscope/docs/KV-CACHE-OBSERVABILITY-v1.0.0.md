@@ -3,7 +3,20 @@
 **Version:** 1.0.0
 **Date:** 2026-03-27
 **Scope:** Disaggregated KV cache metrics for Kimi-K2.5 on Hopper/Blackwell via Dynamo + LMCache
-**Status:** Draft
+**Status:** Draft — **partially retracted, see CORRECTIONS below**
+
+---
+
+## CORRECTIONS (added 2026-04-06)
+
+Parts of the Prometheus metric schema specified below were derived from an incorrect reading of the Dynamo observability surface. The following metric names **do not exist** in NVIDIA Dynamo and have been removed from the InferScope codebase:
+
+- `dynamo_grove_evictions_total` / `dynamo_grove_tier_{gpu,cpu,ssd}_usage_percent` — **"Grove" in Dynamo is a Kubernetes gang-scheduling component** ([docs](https://developer.nvidia.com/blog/nvidia-dynamo-1-production-ready/)), not a KV cache tiering system. It has no Prometheus metrics of its own. This spec confused Grove with KVBM (KV Block Manager), which is the real tiering feature.
+- `dynamo_lmcache_hit_rate` / `dynamo_lmcache_miss_rate` — LMCache is an upstream project ([github.com/LMCache/LMCache](https://github.com/LMCache/LMCache)) that exposes its own metrics under the `lmcache:` prefix. Dynamo does not re-export them under a `dynamo_lmcache_*` prefix. InferScope now reads `lmcache:num_hit_tokens_total` / `lmcache:num_requested_tokens_total` and computes the hit rate client-side.
+- `dynamo_slo_ttft_violations_total` / `dynamo_slo_itl_violations_total` — Dynamo does not expose server-side SLO violation counters. SLO accounting is a client-side concern that must be computed from the TTFT/ITL histograms. The existing `HIGH_TTFT` and `HIGH_ITL` checks cover the same diagnostic surface.
+- `dynamo_nixl_transfer_*` — NIXL is an upstream project whose metrics live on a **separate** Prometheus endpoint (`NIXL_TELEMETRY_PROMETHEUS_PORT`). The exact metric names are not documented in the current Dynamo repo. These field names are kept in the codebase as provisional so the dormant `NIXL_TRANSFER_DOMINATES` check can become live once a real NIXL scrape is captured and the schema confirmed.
+
+The real Dynamo metric surface is documented at [github.com/ai-dynamo/dynamo/blob/main/docs/observability/metrics.md](https://github.com/ai-dynamo/dynamo/blob/main/docs/observability/metrics.md) and the authoritative base names live in `lib/runtime/src/metrics/prometheus_names.rs`. The features this spec proposes (eviction detection, disaggregation health, etc.) are valid and worth implementing — but must be grounded in those real names, not the ones in the tables below.
 
 ---
 

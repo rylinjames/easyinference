@@ -21,9 +21,16 @@ For a Dynamo deployment, the important metric groups are:
 - frontend queue and latency: `dynamo_frontend_*`
 - worker request metrics: `dynamo_component_*`
 - KV cache metrics: `dynamo_component_kvstats_*`
-- LMCache metrics: `dynamo_lmcache_*`
-- disaggregation and transfer metrics: `dynamo_nixl_*`, `dynamo_grove_*`
-- SLO violations: `dynamo_slo_*`
+- routing overhead histograms: `dynamo_router_overhead_*`
+- LMCache metrics: `lmcache:*` (LMCache is an upstream project with its own `/metrics` endpoint — Dynamo does NOT re-export them under a `dynamo_lmcache_*` prefix)
+- KVBM tiering metrics: `kvbm_*` (on a separate port, default `6880` via `DYN_KVBM_METRICS_PORT`, requires `DYN_KVBM_METRICS=true` at launch)
+- NIXL transfer metrics: on a separate port via `NIXL_TELEMETRY_PROMETHEUS_PORT`; schema not yet pinned down in InferScope
+
+There are no server-side `dynamo_slo_*` or `dynamo_grove_*` metrics. "Grove"
+is NVIDIA Dynamo's Kubernetes gang-scheduling component (topology-aware pod
+placement) and has nothing to do with KV tiering. SLO violation accounting
+is a client/harness-side concern and must be computed from TTFT/ITL
+histograms rather than read from server counters.
 
 ### Plan resolution
 

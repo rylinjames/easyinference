@@ -28,8 +28,6 @@ from inferscope.optimization.checks import (
     _check_disagg_without_rdma,
     _check_fp8bmm_crash_risk,
     _check_gpu_underutilization,
-    _check_grove_eviction_storm,
-    _check_grove_tier_imbalance,
     _check_high_itl,
     _check_high_queue_depth,
     _check_high_ttft,
@@ -47,7 +45,6 @@ from inferscope.optimization.checks import (
     _check_pcie_offload_thrash,
     _check_prefill_starvation,
     _check_prefix_cache_disabled,
-    _check_slo_violation_rate,
     _check_speculative_overhead,
     _check_wrong_attention_backend,
     run_all_checks,
@@ -220,32 +217,6 @@ def test_pcie_offload_thrash_silent_on_accumulated_counter() -> None:
 
 
 # ----------------------------------------------------------------------------
-# Tier 1: GROVE_EVICTION_STORM — same counter bug, different metric
-# ----------------------------------------------------------------------------
-
-
-def test_grove_eviction_storm_fires_on_active_churn() -> None:
-    """Many evictions relative to successes while GPU tier is full = real churn."""
-    m = _metrics(
-        grove_evictions=500.0,
-        request_success_total=2_000.0,  # 25% eviction rate
-        grove_tier_gpu_pct=0.92,
-    )
-    assert _check_grove_eviction_storm(m, _ctx()) is not None
-
-
-def test_grove_eviction_storm_silent_on_accumulated_counter() -> None:
-    """101 lifetime evictions across 50,000 successful requests (~0.2%)
-    with a warm GPU tier is normal steady-state behavior, not a storm."""
-    m = _metrics(
-        grove_evictions=101.0,
-        request_success_total=50_000.0,
-        grove_tier_gpu_pct=0.86,
-    )
-    assert _check_grove_eviction_storm(m, _ctx()) is None
-
-
-# ----------------------------------------------------------------------------
 # Tier 1: MISSING_QUANTIZATION — hardware-constraint check
 # ----------------------------------------------------------------------------
 
@@ -383,21 +354,6 @@ def test_nixl_transfer_dominates_silent_in_aggregated_topology() -> None:
 def test_nixl_transfer_dominates_silent_when_metric_missing() -> None:
     m = _metrics(nixl_transfer_latency_s=None, ttft_avg_s=4.0)
     assert _check_nixl_transfer_dominates(m, _ctx(split_prefill_decode=True)) is None
-
-
-# ----------------------------------------------------------------------------
-# Tier 1: GROVE_TIER_IMBALANCE — multi-tier ratio
-# ----------------------------------------------------------------------------
-
-
-def test_grove_tier_imbalance_fires_when_gpu_saturated_but_lower_tiers_empty() -> None:
-    m = _metrics(grove_tier_gpu_pct=0.95, grove_tier_cpu_pct=0.05, grove_tier_ssd_pct=0.0)
-    assert _check_grove_tier_imbalance(m, _ctx()) is not None
-
-
-def test_grove_tier_imbalance_silent_when_tiers_balanced() -> None:
-    m = _metrics(grove_tier_gpu_pct=0.80, grove_tier_cpu_pct=0.40, grove_tier_ssd_pct=0.15)
-    assert _check_grove_tier_imbalance(m, _ctx()) is None
 
 
 # ============================================================================
@@ -825,45 +781,6 @@ def test_batch_itl_tradeoff_silent_at_low_concurrency() -> None:
 def test_batch_itl_tradeoff_silent_when_throughput_missing() -> None:
     m = _metrics(itl_avg_s=0.08, requests_running=80.0, gen_throughput_tps=0.0)
     assert _check_batch_itl_tradeoff(m, _ctx()) is None
-
-
-# ---------- SLO_VIOLATION_RATE ----------
-
-
-def test_slo_violation_rate_critical_above_15_percent() -> None:
-    m = _metrics(
-        slo_ttft_violations=120.0,
-        slo_itl_violations=80.0,
-        request_success_total=1000.0,  # 20% rate
-    )
-    finding = _check_slo_violation_rate(m, _ctx())
-    assert finding is not None
-    assert finding.severity == "critical"
-
-
-def test_slo_violation_rate_warning_in_5_to_15_range() -> None:
-    m = _metrics(
-        slo_ttft_violations=60.0,
-        slo_itl_violations=20.0,
-        request_success_total=1000.0,  # 8% rate
-    )
-    finding = _check_slo_violation_rate(m, _ctx())
-    assert finding is not None
-    assert finding.severity == "warning"
-
-
-def test_slo_violation_rate_silent_below_5_percent() -> None:
-    m = _metrics(
-        slo_ttft_violations=30.0,
-        slo_itl_violations=10.0,
-        request_success_total=2000.0,  # 2% rate — healthy
-    )
-    assert _check_slo_violation_rate(m, _ctx()) is None
-
-
-def test_slo_violation_rate_silent_with_no_violations() -> None:
-    m = _metrics(request_success_total=5000.0)
-    assert _check_slo_violation_rate(m, _ctx()) is None
 
 
 # ---------- DECODE_STARVATION / PREFILL_STARVATION (paired) ----------

@@ -8,7 +8,7 @@ InferScope is a **production-grade MCP server** for NVIDIA Dynamo inference depl
 - **Engine:** NVIDIA Dynamo 1.0 (vLLM/SGLang as worker backends, not standalone)
 - **GPUs:** Hopper H100 SXM, H200 SXM; Blackwell B200, B300
 - **Workload:** Long-context coding (131K context default)
-- **KV cache:** LMCache + Grove hierarchical tiering (GPU HBM -> CPU DRAM -> NVMe -> S3)
+- **KV cache:** LMCache + KVBM (KV Block Manager) hierarchical tiering (GPU HBM -> CPU DRAM -> NVMe -> object storage). Note: "Grove" is NVIDIA Dynamo's Kubernetes gang-scheduling component, *not* KV tiering — earlier revisions of this doc conflated the two.
 - **Topology:** Aggregated (single worker) or disaggregated (prefill/decode split with NIXL KV transfer)
 
 Target users: Cursor, Anthropic, and neo-cloud providers benchmarking and monitoring Dynamo deployments.

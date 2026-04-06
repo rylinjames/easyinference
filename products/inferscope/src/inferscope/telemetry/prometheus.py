@@ -2,8 +2,17 @@
 
 Parses the standard Prometheus text exposition format from /metrics endpoints.
 Metric names are sourced from official docs:
-- vLLM: https://docs.vllm.ai/en/v0.8.5/design/v1/metrics.html
+- vLLM:   https://docs.vllm.ai/en/v0.8.5/design/v1/metrics.html
 - SGLang: https://docs.sglang.io/references/production_metrics.html
+- Dynamo: https://github.com/ai-dynamo/dynamo/blob/main/docs/observability/metrics.md
+          and lib/runtime/src/metrics/prometheus_names.rs (authoritative constants)
+
+Historical note: earlier revisions of this file also listed fictional
+`dynamo_grove_*`, `dynamo_lmcache_*`, and `dynamo_slo_*` metric names.
+Those were invented — Dynamo does not emit them. Grove is a Kubernetes
+gang-scheduling component with no Prometheus metrics; LMCache uses the
+upstream `lmcache:` prefix; SLO violation counters don't exist
+server-side (compute from histogram buckets client-side if needed).
 """
 
 from __future__ import annotations
@@ -85,7 +94,10 @@ DYNAMO_METRICS = {
     "dynamo_component_kvstats_total_blocks": "Total KV blocks on the worker",
     "dynamo_component_kvstats_gpu_cache_usage_percent": "Worker GPU KV cache utilization",
     "dynamo_component_kvstats_gpu_prefix_cache_hit_rate": "Worker GPU prefix cache hit rate",
-    # KVBM offload/onboard block counters
+    # KVBM offload/onboard block counters. KVBM exposes these on a SEPARATE
+    # endpoint (default port 6880 via DYN_KVBM_METRICS_PORT) and only when
+    # launched with DYN_KVBM_METRICS=true. An operator must add that port
+    # as an additional metrics_target for these to appear in the scrape.
     "kvbm_offload_blocks_d2h": "GPU-to-CPU KV block offload operations",
     "kvbm_offload_blocks_h2d": "CPU-to-disk KV block offload operations",
     "kvbm_offload_blocks_d2d": "Device-to-device KV block offload operations",
@@ -93,26 +105,19 @@ DYNAMO_METRICS = {
     "kvbm_onboard_blocks_h2d": "CPU-to-GPU KV block onboard operations",
     "kvbm_onboard_blocks_d2d": "Device-to-device KV block onboard operations",
     "kvbm_onboard_blocks_o2d": "Object-storage-to-device KV block onboard operations",
-    # KVBM tier cache hit rates
     "kvbm_host_cache_hit_rate": "CPU tier KV cache hit rate",
     "kvbm_disk_cache_hit_rate": "Disk tier KV cache hit rate",
     "kvbm_object_cache_hit_rate": "Object storage tier KV cache hit rate",
     "kvbm_matched_tokens": "Tokens reused from KVBM cache",
-    # NIXL transfer metrics
-    "dynamo_nixl_transfer_latency_seconds": "NIXL KV transfer latency (prefill-to-decode)",
-    "dynamo_nixl_transfer_bytes_total": "Total bytes transferred via NIXL",
-    "dynamo_nixl_transfer_failures_total": "Failed NIXL transfer attempts",
-    # Grove tier usage
-    "dynamo_grove_tier_gpu_usage_percent": "Grove GPU tier utilization",
-    "dynamo_grove_tier_cpu_usage_percent": "Grove CPU tier utilization",
-    "dynamo_grove_tier_ssd_usage_percent": "Grove SSD tier utilization",
-    "dynamo_grove_evictions_total": "Total Grove tier eviction events",
-    # LMCache integration
-    "dynamo_lmcache_hit_rate": "LMCache hit rate (Dynamo-reported)",
-    "dynamo_lmcache_miss_rate": "LMCache miss rate (Dynamo-reported)",
-    # SLO violations
-    "dynamo_slo_ttft_violations_total": "Requests exceeding TTFT SLO",
-    "dynamo_slo_itl_violations_total": "Decode steps exceeding ITL SLO",
+    # NIXL transfer metrics — exposed on a SEPARATE endpoint via
+    # NIXL_TELEMETRY_PROMETHEUS_PORT. The exact metric names are not
+    # documented in the current Dynamo repo (NIXL is its own upstream
+    # project). The names below are provisional, left in place so the
+    # dormant NIXL_TRANSFER_DOMINATES check becomes live as soon as a
+    # real NIXL scrape target is wired in and the real names confirmed.
+    "dynamo_nixl_transfer_latency_seconds": "NIXL KV transfer latency (provisional name)",
+    "dynamo_nixl_transfer_bytes_total": "Total bytes transferred via NIXL (provisional name)",
+    "dynamo_nixl_transfer_failures_total": "Failed NIXL transfer attempts (provisional name)",
 }
 
 LMCACHE_METRICS: dict[str, str] = {

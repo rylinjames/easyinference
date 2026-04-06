@@ -727,43 +727,6 @@ def _check_nixl_transfer_dominates(m: NormalizedMetrics, ctx: DeploymentContext)
     return None
 
 
-def _check_grove_tier_imbalance(m: NormalizedMetrics, ctx: DeploymentContext) -> AuditFinding | None:
-    """GROVE_TIER_IMBALANCE — GPU tier saturated while CPU/SSD tiers are underused.
-
-    Grounded in inferencebreakpoints/05-cold-start/caching/tiered-caching:
-    Multi-tier caching (GPU HBM -> CPU DRAM -> NVMe -> S3) should distribute load.
-    When GPU tier is full but lower tiers are empty, tiering policy is misconfigured.
-    """
-    if (
-        m.grove_tier_gpu_pct > 0.90
-        and m.grove_tier_cpu_pct < 0.10
-        and m.grove_tier_ssd_pct < 0.10
-    ):
-        return AuditFinding(
-            check_id="GROVE_TIER_IMBALANCE",
-            severity="warning",
-            title="Grove GPU tier saturated while CPU/SSD tiers are underused",
-            description=(
-                f"GPU tier at {m.grove_tier_gpu_pct:.0%} but CPU tier at {m.grove_tier_cpu_pct:.0%} "
-                f"and SSD tier at {m.grove_tier_ssd_pct:.0%}. KV cache tiering policy is not "
-                "spilling to lower tiers — sessions are being evicted from GPU instead of "
-                "demoted to CPU DRAM or NVMe."
-            ),
-            current_value=(
-                f"GPU={m.grove_tier_gpu_pct:.0%}, CPU={m.grove_tier_cpu_pct:.0%}, "
-                f"SSD={m.grove_tier_ssd_pct:.0%}"
-            ),
-            recommended_value="GPU <85% with spillover to CPU/SSD tiers",
-            fix_command=(
-                "Enable Grove tier demotion policy, set grove_spill_threshold=0.85, "
-                "or verify CPU/NVMe capacity is provisioned for KV tiering"
-            ),
-            confidence=0.85,
-            evidence="metric_correlation",
-        )
-    return None
-
-
 def _check_lmcache_cold_start(m: NormalizedMetrics, ctx: DeploymentContext) -> AuditFinding | None:
     """LMCACHE_COLD_START — very low LMCache hit rate indicating cache warmup needed.
 
@@ -832,77 +795,6 @@ def _check_batch_itl_tradeoff(m: NormalizedMetrics, ctx: DeploymentContext) -> A
     return None
 
 
-def _check_slo_violation_rate(m: NormalizedMetrics, ctx: DeploymentContext) -> AuditFinding | None:
-    """SLO_VIOLATION_RATE — Dynamo SLO violations accumulating.
-
-    Grounded in inferencebreakpoints/06-prefill/ttft-analysis/ttft-slo-tiers:
-    Different use cases have dramatically different TTFT requirements. High SLO
-    violation rates indicate the deployment needs SLO-tiered scheduling.
-    """
-    total_violations = m.slo_ttft_violations + m.slo_itl_violations
-    if total_violations > 50 and m.request_success_total > 0:
-        violation_rate = total_violations / max(m.request_success_total, 1)
-        if violation_rate > 0.05:
-            return AuditFinding(
-                check_id="SLO_VIOLATION_RATE",
-                severity="critical" if violation_rate > 0.15 else "warning",
-                title=f"SLO violation rate at {violation_rate:.1%}",
-                description=(
-                    f"{m.slo_ttft_violations:.0f} TTFT violations and {m.slo_itl_violations:.0f} ITL "
-                    f"violations across {m.request_success_total:.0f} requests ({violation_rate:.1%} rate). "
-                    "Consider SLO-tiered scheduling to differentiate interactive vs batch traffic, "
-                    "or add capacity to meet current SLO targets."
-                ),
-                current_value=f"{violation_rate:.1%} violation rate ({total_violations:.0f} total)",
-                recommended_value="<5% SLO violation rate",
-                fix_command=(
-                    "Add replicas, enable SLO-aware scheduling, or split traffic into "
-                    "latency-optimized and throughput-optimized Dynamo pools"
-                ),
-                confidence=0.9,
-                evidence="metric_correlation",
-            )
-    return None
-
-
-def _check_grove_eviction_storm(m: NormalizedMetrics, ctx: DeploymentContext) -> AuditFinding | None:
-    """GROVE_EVICTION_STORM — high eviction rate from Grove tiered cache.
-
-    Grounded in inferencebreakpoints/07-kv-cache/eviction-policies:
-    High eviction rates indicate the working set exceeds all tier capacity.
-
-    Like the preemption-based checks, `grove_evictions` is a monotonic
-    counter. Compare it against successful requests to get a rate so
-    long-running deployments don't false-positive on accumulated eviction
-    counts from normal steady-state behavior.
-    """
-    if m.request_success_total <= 0 or m.grove_evictions <= 0:
-        return None
-    eviction_rate = m.grove_evictions / m.request_success_total
-    if eviction_rate > 0.02 and m.grove_tier_gpu_pct > 0.85:
-        return AuditFinding(
-            check_id="GROVE_EVICTION_STORM",
-            severity="warning",
-            title="Grove eviction storm — KV tiering capacity exhausted",
-            description=(
-                f"Grove eviction rate is {eviction_rate:.1%} "
-                f"({m.grove_evictions:.0f}/{m.request_success_total:.0f}) with GPU tier at "
-                f"{m.grove_tier_gpu_pct:.0%}. The KV working set exceeds tiered cache capacity. "
-                "Sessions are being evicted rather than demoted, causing recomputation on "
-                "subsequent requests."
-            ),
-            current_value=f"{eviction_rate:.1%} eviction rate, GPU tier at {m.grove_tier_gpu_pct:.0%}",
-            recommended_value="<1% eviction rate with headroom in at least one tier",
-            fix_command=(
-                "Increase CPU DRAM or NVMe tier capacity, reduce concurrent sessions, "
-                "or enable aggressive KV compression before tiering"
-            ),
-            confidence=0.85,
-            evidence="metric_correlation",
-        )
-    return None
-
-
 # =============================================================================
 # CHECK REGISTRY
 # =============================================================================
@@ -936,9 +828,6 @@ _ALL_CHECKS = [
     _check_oom_despite_free,
     # Breakpoint-informed checks (derived from inferencebreakpoints knowledge base)
     _check_nixl_transfer_dominates,
-    _check_grove_tier_imbalance,
     _check_lmcache_cold_start,
     _check_batch_itl_tradeoff,
-    _check_slo_violation_rate,
-    _check_grove_eviction_storm,
 ]

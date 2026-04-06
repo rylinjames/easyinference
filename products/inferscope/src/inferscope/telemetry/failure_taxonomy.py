@@ -15,7 +15,6 @@ class FailureMode(StrEnum):
     DECODE_QUEUE_BACKUP = "decode_queue_backup"
     KV_TRANSFER_TIMEOUT = "kv_transfer_timeout"
     NIXL_FAILURE = "nixl_failure"
-    GROVE_TIER_EXHAUSTION = "grove_tier_exhaustion"
     WORKER_CRASH = "worker_crash"
     ROUTER_OVERLOAD = "router_overload"
     LMCACHE_MISS_STORM = "lmcache_miss_storm"
@@ -93,20 +92,6 @@ def classify_failure_modes(metrics: NormalizedMetrics) -> list[ClassifiedFailure
             confidence=0.93,
             description="NIXL transfer failures were observed during runtime.",
             evidence=[f"nixl_transfer_failures={metrics.nixl_transfer_failures}"],
-        ),
-    )
-    _append_if(
-        metrics.grove_tier_ssd_pct > 0.8 or metrics.grove_evictions > 0,
-        findings,
-        ClassifiedFailure(
-            mode=FailureMode.GROVE_TIER_EXHAUSTION,
-            severity="warning",
-            confidence=0.76,
-            description="Tiering pressure indicates Grove-style cache exhaustion or eviction churn.",
-            evidence=[
-                f"grove_tier_ssd_pct={metrics.grove_tier_ssd_pct}",
-                f"grove_evictions={metrics.grove_evictions}",
-            ],
         ),
     )
     _append_if(
