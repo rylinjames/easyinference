@@ -53,7 +53,7 @@ dynamo_frontend_output_tokens_total{model="Kimi-K2.5"} 4500000
 
 # HELP dynamo_frontend_model_migration_total Total request migrations
 # TYPE dynamo_frontend_model_migration_total counter
-dynamo_frontend_model_migration_total{model="Kimi-K2.5",migration_type="worker_drain"} 3
+dynamo_frontend_model_migration_total{migration_type="worker_drain",model="Kimi-K2.5"} 3
 
 # HELP dynamo_frontend_model_cancellation_total Total client cancellations
 # TYPE dynamo_frontend_model_cancellation_total counter
@@ -128,28 +128,28 @@ dynamo_frontend_model_migration_limit{model="Kimi-K2.5"} 2
 
 # HELP dynamo_frontend_worker_active_decode_blocks Active decode KV blocks per worker
 # TYPE dynamo_frontend_worker_active_decode_blocks gauge
-dynamo_frontend_worker_active_decode_blocks{worker_id="w0",dp_rank="0",worker_type="decode"} 180
-dynamo_frontend_worker_active_decode_blocks{worker_id="w1",dp_rank="0",worker_type="decode"} 210
+dynamo_frontend_worker_active_decode_blocks{dp_rank="0",worker_id="w0",worker_type="decode"} 180
+dynamo_frontend_worker_active_decode_blocks{dp_rank="0",worker_id="w1",worker_type="decode"} 210
 
 # HELP dynamo_frontend_worker_active_prefill_tokens Active prefill tokens per worker
 # TYPE dynamo_frontend_worker_active_prefill_tokens gauge
-dynamo_frontend_worker_active_prefill_tokens{worker_id="w0",dp_rank="0",worker_type="prefill"} 4096
-dynamo_frontend_worker_active_prefill_tokens{worker_id="w1",dp_rank="0",worker_type="prefill"} 3072
+dynamo_frontend_worker_active_prefill_tokens{dp_rank="0",worker_id="w0",worker_type="prefill"} 4096
+dynamo_frontend_worker_active_prefill_tokens{dp_rank="0",worker_id="w1",worker_type="prefill"} 3072
 
 # HELP dynamo_frontend_worker_last_time_to_first_token_seconds Last TTFT per worker
 # TYPE dynamo_frontend_worker_last_time_to_first_token_seconds gauge
-dynamo_frontend_worker_last_time_to_first_token_seconds{worker_id="w0",dp_rank="0",worker_type="decode"} 0.28
-dynamo_frontend_worker_last_time_to_first_token_seconds{worker_id="w1",dp_rank="0",worker_type="decode"} 0.31
+dynamo_frontend_worker_last_time_to_first_token_seconds{dp_rank="0",worker_id="w0",worker_type="decode"} 0.28
+dynamo_frontend_worker_last_time_to_first_token_seconds{dp_rank="0",worker_id="w1",worker_type="decode"} 0.31
 
 # HELP dynamo_frontend_worker_last_input_sequence_tokens Last input tokens per worker
 # TYPE dynamo_frontend_worker_last_input_sequence_tokens gauge
-dynamo_frontend_worker_last_input_sequence_tokens{worker_id="w0",dp_rank="0",worker_type="decode"} 2040
-dynamo_frontend_worker_last_input_sequence_tokens{worker_id="w1",dp_rank="0",worker_type="decode"} 1960
+dynamo_frontend_worker_last_input_sequence_tokens{dp_rank="0",worker_id="w0",worker_type="decode"} 2040
+dynamo_frontend_worker_last_input_sequence_tokens{dp_rank="0",worker_id="w1",worker_type="decode"} 1960
 
 # HELP dynamo_frontend_worker_last_inter_token_latency_seconds Last ITL per worker
 # TYPE dynamo_frontend_worker_last_inter_token_latency_seconds gauge
-dynamo_frontend_worker_last_inter_token_latency_seconds{worker_id="w0",dp_rank="0",worker_type="decode"} 0.019
-dynamo_frontend_worker_last_inter_token_latency_seconds{worker_id="w1",dp_rank="0",worker_type="decode"} 0.021
+dynamo_frontend_worker_last_inter_token_latency_seconds{dp_rank="0",worker_id="w0",worker_type="decode"} 0.019
+dynamo_frontend_worker_last_inter_token_latency_seconds{dp_rank="0",worker_id="w1",worker_type="decode"} 0.021
 
 # NOTE: The component label values are `prefill` / `backend` / `frontend`
 # per DASHBOARD_METRICS.md and the Grafana queries in
@@ -161,32 +161,32 @@ dynamo_frontend_worker_last_inter_token_latency_seconds{worker_id="w1",dp_rank="
 
 # HELP dynamo_component_inflight_requests Inflight requests at backend
 # TYPE dynamo_component_inflight_requests gauge
-dynamo_component_inflight_requests{dynamo_namespace="default",dynamo_component="backend",dynamo_endpoint="generate"} 12
+dynamo_component_inflight_requests{dynamo_component="backend",dynamo_endpoint="generate",dynamo_namespace="default"} 12
 
 # HELP dynamo_component_requests_total Total backend requests
 # TYPE dynamo_component_requests_total counter
-dynamo_component_requests_total{dynamo_namespace="default",dynamo_component="backend",dynamo_endpoint="generate"} 10000
+dynamo_component_requests_total{dynamo_component="backend",dynamo_endpoint="generate",dynamo_namespace="default"} 10000
 
 # HELP dynamo_component_request_duration_seconds Backend request duration histogram
 # TYPE dynamo_component_request_duration_seconds histogram
-dynamo_component_request_duration_seconds_sum{dynamo_namespace="default",dynamo_component="backend",dynamo_endpoint="generate"} 11500
-dynamo_component_request_duration_seconds_count{dynamo_namespace="default",dynamo_component="backend",dynamo_endpoint="generate"} 10000
+dynamo_component_request_duration_seconds_sum{dynamo_component="backend",dynamo_endpoint="generate",dynamo_namespace="default"} 11500
+dynamo_component_request_duration_seconds_count{dynamo_component="backend",dynamo_endpoint="generate",dynamo_namespace="default"} 10000
 
 # HELP dynamo_component_request_bytes_total Total request payload bytes
 # TYPE dynamo_component_request_bytes_total counter
-dynamo_component_request_bytes_total{dynamo_namespace="default",dynamo_component="backend",dynamo_endpoint="generate"} 41943040
+dynamo_component_request_bytes_total{dynamo_component="backend",dynamo_endpoint="generate",dynamo_namespace="default"} 41943040
 
 # HELP dynamo_component_response_bytes_total Total response payload bytes
 # TYPE dynamo_component_response_bytes_total counter
-dynamo_component_response_bytes_total{dynamo_namespace="default",dynamo_component="backend",dynamo_endpoint="generate"} 104857600
+dynamo_component_response_bytes_total{dynamo_component="backend",dynamo_endpoint="generate",dynamo_namespace="default"} 104857600
 
 # HELP dynamo_component_uptime_seconds Component uptime
 # TYPE dynamo_component_uptime_seconds gauge
-dynamo_component_uptime_seconds{dynamo_namespace="default",dynamo_component="backend",dynamo_endpoint="generate"} 3600
+dynamo_component_uptime_seconds{dynamo_component="backend",dynamo_endpoint="generate",dynamo_namespace="default"} 3600
 
 # HELP dynamo_component_kv_publisher_engines_dropped_events_total Dropped KV publisher events
 # TYPE dynamo_component_kv_publisher_engines_dropped_events_total counter
-dynamo_component_kv_publisher_engines_dropped_events_total{dynamo_namespace="default",dynamo_component="backend"} 0
+dynamo_component_kv_publisher_engines_dropped_events_total{dynamo_component="backend",dynamo_namespace="default"} 0
 
 # Note: dynamo_component_total_blocks and dynamo_component_gpu_cache_usage_percent
 # are emitted via the LLMBackendMetrics class with label set
@@ -195,19 +195,19 @@ dynamo_component_kv_publisher_engines_dropped_events_total{dynamo_namespace="def
 
 # HELP dynamo_component_total_blocks Total KV blocks
 # TYPE dynamo_component_total_blocks gauge
-dynamo_component_total_blocks{model="Kimi-K2.5",dynamo_component="backend",dp_rank="0"} 16384
+dynamo_component_total_blocks{dp_rank="0",dynamo_component="backend",model="Kimi-K2.5"} 16384
 
 # HELP dynamo_component_gpu_cache_usage_percent GPU KV cache usage
 # TYPE dynamo_component_gpu_cache_usage_percent gauge
-dynamo_component_gpu_cache_usage_percent{model="Kimi-K2.5",dynamo_component="backend",dp_rank="0"} 0.50
+dynamo_component_gpu_cache_usage_percent{dp_rank="0",dynamo_component="backend",model="Kimi-K2.5"} 0.50
 
 # HELP dynamo_component_errors_total Total backend errors
 # TYPE dynamo_component_errors_total counter
-dynamo_component_errors_total{dynamo_namespace="default",dynamo_component="backend",dynamo_endpoint="generate"} 5
+dynamo_component_errors_total{dynamo_component="backend",dynamo_endpoint="generate",dynamo_namespace="default"} 5
 
 # HELP dynamo_component_kv_cache_events_applied KV cache event counter
 # TYPE dynamo_component_kv_cache_events_applied counter
-dynamo_component_kv_cache_events_applied{status="applied",event_type="store"} 45000
+dynamo_component_kv_cache_events_applied{event_type="store",status="applied"} 45000
 
 # HELP dynamo_router_overhead_total_ms Total routing overhead per request
 # TYPE dynamo_router_overhead_total_ms histogram
