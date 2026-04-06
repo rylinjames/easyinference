@@ -19,15 +19,32 @@ ALLOWED_SCHEMES = {"http", "https"}
 
 # Private/reserved IP ranges that should be blocked for SSRF protection
 _PRIVATE_NETWORKS = [
+    ipaddress.ip_network("0.0.0.0/8"),  # RFC 791 "this network" — resolves to 127.0.0.1 from local
     ipaddress.ip_network("10.0.0.0/8"),
     ipaddress.ip_network("172.16.0.0/12"),
     ipaddress.ip_network("192.168.0.0/16"),
     ipaddress.ip_network("127.0.0.0/8"),
-    ipaddress.ip_network("169.254.0.0/16"),  # Link-local
+    ipaddress.ip_network("169.254.0.0/16"),  # Link-local (incl. cloud metadata 169.254.169.254)
+    ipaddress.ip_network("::/128"),  # IPv6 unspecified — analog of 0.0.0.0
     ipaddress.ip_network("::1/128"),  # IPv6 loopback
+    ipaddress.ip_network("::ffff:0:0/96"),  # IPv4-mapped IPv6 prefix (defense-in-depth; we also unwrap)
     ipaddress.ip_network("fc00::/7"),  # IPv6 ULA
     ipaddress.ip_network("fe80::/10"),  # IPv6 link-local
 ]
+
+# Hostnames that map to loopback / private targets even without an IP literal.
+# Defense-in-depth supplement to the IP-range check; runs even when DNS resolution is unavailable.
+_BLOCKED_HOSTNAMES = frozenset(
+    {
+        "localhost",
+        "localhost.localdomain",
+        "ip6-localhost",
+        "ip6-loopback",
+        "loopback",
+        "local.host",
+        "broadcasthost",
+    }
+)
 
 
 class InputValidationError(ValueError):
@@ -99,17 +116,31 @@ def validate_endpoint(endpoint: str, allow_private: bool = False) -> str:
             hostname_is_ip = False
 
         if hostname_is_ip:
+            # Unwrap IPv4-mapped IPv6 addresses (e.g. ::ffff:127.0.0.1) before
+            # the IP-range check. httpx/requests resolve these to the underlying
+            # IPv4 address, so we must check the unwrapped form against the
+            # private IPv4 networks.
+            check_ip: ipaddress.IPv4Address | ipaddress.IPv6Address
+            if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
+                check_ip = ip.ipv4_mapped
+            else:
+                check_ip = ip
             for network in _PRIVATE_NETWORKS:
-                if ip in network:
+                if check_ip in network:
                     raise InputValidationError(
                         f"Endpoint targets private IP range ({network}). Use allow_private=True for local development."
                     )
         else:
-            # hostname is not an IP — DNS resolution happens at request time
-            # Block obvious localhost aliases
+            # hostname is not an IP — DNS resolution happens at request time.
+            # Block known loopback / private hostname aliases as defense-in-depth.
+            # Note: this does not catch DNS rebinding (e.g. *.nip.io, *.sslip.io)
+            # because we do not resolve the hostname at validation time. For
+            # network-exposed deployments, add an SSRF gate at the reverse proxy.
             hostname_lower = parsed.hostname.lower()
-            if hostname_lower in ("localhost", "localhost.localdomain"):
-                raise InputValidationError("Endpoint targets localhost. Use allow_private=True for local development.")
+            if hostname_lower in _BLOCKED_HOSTNAMES:
+                raise InputValidationError(
+                    f"Endpoint targets blocked hostname '{hostname_lower}'. Use allow_private=True for local development."
+                )
 
     return endpoint.rstrip("/")
 

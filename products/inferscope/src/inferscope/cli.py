@@ -387,6 +387,12 @@ def serve(
             "[yellow]⚠ HTTP transport binds to 127.0.0.1 (localhost only). "
             "Use a reverse proxy with authentication for production.[/yellow]"
         )
+        console.print(
+            "[yellow]⚠ The SSRF guard validates endpoint URLs against literal private IPs and "
+            "loopback hostnames, but it does NOT pin DNS resolution. For network-exposed "
+            "deployments, add an SSRF gate (or DNS pinning) at your reverse proxy layer to block "
+            "DNS-rebinding attacks via *.nip.io / *.sslip.io / similar.[/yellow]"
+        )
         mcp.run(transport="streamable-http", host="127.0.0.1", port=port)
 
 
