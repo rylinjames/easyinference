@@ -69,8 +69,45 @@ def _scrape_from_text(text: str) -> ScrapeResult:
 
 
 def _load_healthy_fixture() -> ScrapeResult:
+    """Load the main Dynamo frontend + backend fixture.
+
+    This represents a scrape of the normal Dynamo /metrics endpoint on
+    port 8000. KVBM metrics are on a separate endpoint (port 6880) and
+    have their own fixture — see _load_kvbm_fixture below.
+    """
     text = (_FIXTURE_DIR / "dynamo_metrics_healthy.txt").read_text()
     return _scrape_from_text(text)
+
+
+def _load_kvbm_fixture() -> ScrapeResult:
+    """Load the KVBM /metrics fixture.
+
+    KVBM is exposed on a separate Prometheus endpoint (default port
+    6880 via DYN_KVBM_METRICS_PORT) and only when the operator
+    launches Dynamo with DYN_KVBM_METRICS=true. In a real deployment
+    an operator would add this as a second metrics_target on the
+    scrape; here we load it as an independent ScrapeResult and merge
+    it into the main scrape's raw_metrics dict in tests that need the
+    full picture.
+    """
+    text = (_FIXTURE_DIR / "dynamo_metrics_kvbm_healthy.txt").read_text()
+    return _scrape_from_text(text)
+
+
+def _load_combined_fixture() -> ScrapeResult:
+    """Merge the main + KVBM fixtures into a single ScrapeResult.
+
+    Mirrors what would happen if an operator configured InferScope
+    with both the frontend and the KVBM endpoint as metrics targets:
+    the normalizer sees all metrics in a single scrape regardless of
+    which port they came from, because the Prometheus text format is
+    stateless.
+    """
+    main = _load_healthy_fixture()
+    kvbm = _load_kvbm_fixture()
+    main.raw_metrics.update(kvbm.raw_metrics)
+    main.samples = list(main.samples) + list(kvbm.samples)
+    return main
 
 
 def _healthy_ctx() -> DeploymentContext:
@@ -112,36 +149,40 @@ def test_fixture_detects_dynamo_engine() -> None:
     assert scrape.engine == "dynamo"
 
 
-#: Metric names in DYNAMO_METRICS that are NOT emitted on the main
-#: Dynamo frontend + backend endpoints and therefore shouldn't appear
-#: in a frontend-scrape fixture.
-#:
-#: KVBM metrics live on port 6880 (DYN_KVBM_METRICS_PORT) when the user
-#: launches Dynamo with DYN_KVBM_METRICS=true. They deserve their own
-#: fixture file once someone captures a real KVBM scrape.
-_SEPARATE_ENDPOINT_METRIC_PREFIXES = ("kvbm_",)
+#: Metric names in DYNAMO_METRICS that are optional object-storage tier
+#: KVBM telemetry — only emitted when the operator configures an S3/GCS
+#: tier. A deployment with only GPU + CPU + SSD tiers won't emit these,
+#: so the schema canary doesn't require them in the KVBM fixture.
+_OPTIONAL_METRICS: frozenset[str] = frozenset(
+    {
+        "kvbm_offload_blocks_d2o",
+        "kvbm_onboard_blocks_o2d",
+    }
+)
 
 
 def test_fixture_covers_all_dynamo_metrics() -> None:
     """Schema-drift canary.
 
-    For every metric name in DYNAMO_METRICS that can appear on the
-    main frontend/backend Dynamo scrape, assert that the parsed fixture
-    contains either the bare metric name (for gauges/counters) OR the
-    `_sum` / `_count` pair (for histograms). If a future refactor adds
-    a new metric to DYNAMO_METRICS and forgets to update the fixture,
-    this test fails on the first CI run.
+    For every metric name in DYNAMO_METRICS, assert that the combined
+    (main frontend + KVBM) fixture contains either the bare metric
+    name (for gauges/counters) OR the `_sum` / `_count` pair (for
+    histograms). If a future refactor adds a new metric to
+    DYNAMO_METRICS and forgets to update the fixture, this test fails
+    on the first CI run.
 
-    Works the other direction too: if a metric is removed from
-    DYNAMO_METRICS, this test still passes because it doesn't care
-    about the fixture having extra metrics — that case is covered
-    naturally by parse-all-expected-families.
+    Uses the combined fixture so the canary covers every scrape
+    endpoint InferScope expects to talk to — main Dynamo on :8000
+    plus KVBM on :6880. Operators who only configure the main endpoint
+    will never see KVBM metrics, which is correct no-data behavior;
+    the canary's job is to catch schema drift, not to enforce a
+    particular deployment topology.
     """
-    scrape = _load_healthy_fixture()
+    scrape = _load_combined_fixture()
     raw = scrape.raw_metrics
     missing: list[str] = []
     for name in DYNAMO_METRICS:
-        if name.startswith(_SEPARATE_ENDPOINT_METRIC_PREFIXES):
+        if name in _OPTIONAL_METRICS:
             continue
         bare_present = name in raw
         histogram_present = (f"{name}_sum" in raw) and (f"{name}_count" in raw)
@@ -149,9 +190,10 @@ def test_fixture_covers_all_dynamo_metrics() -> None:
             missing.append(name)
     assert not missing, (
         "Fixture is missing these metrics from DYNAMO_METRICS. Either "
-        "add them to dynamo_metrics_healthy.txt with realistic healthy "
-        "values or (if they belong on a separate endpoint like KVBM or "
-        "NIXL) add the prefix to _SEPARATE_ENDPOINT_METRIC_PREFIXES. "
+        "add them to the appropriate fixture file (dynamo_metrics_healthy.txt "
+        "for main scrape, dynamo_metrics_kvbm_healthy.txt for KVBM) with "
+        "realistic healthy values, or add the name to _OPTIONAL_METRICS "
+        "if it only appears under specific deployment configurations. "
         f"Missing: {sorted(missing)}"
     )
 
@@ -378,6 +420,74 @@ def test_high_itl_fires_at_150ms() -> None:
     findings = run_all_checks(m, _healthy_ctx())
     ids = {f.check_id for f in findings}
     assert "HIGH_ITL" in ids
+
+
+# ============================================================================
+# KVBM fixture — separate scrape endpoint, parsed independently
+# ============================================================================
+
+
+def test_kvbm_fixture_parses_all_expected_kvbm_metrics() -> None:
+    """Every kvbm_* name in DYNAMO_METRICS that's in the KVBM fixture
+    must parse. Catches a rename or typo at the parse layer before the
+    normalizer even runs."""
+    scrape = _load_kvbm_fixture()
+    expected_kvbm = [name for name in DYNAMO_METRICS if name.startswith("kvbm_")]
+    for name in expected_kvbm:
+        if name in _OPTIONAL_METRICS:
+            continue
+        assert name in scrape.raw_metrics, (
+            f"KVBM fixture missing `{name}` — either add it to "
+            f"dynamo_metrics_kvbm_healthy.txt or mark it as optional."
+        )
+
+
+def test_kvbm_fixture_normalizes_into_tiering_fields() -> None:
+    """When a KVBM scrape is merged into the main scrape, the normalizer
+    populates the kvbm_* fields on NormalizedMetrics. This is the code
+    path an operator hits when they configure both :8000 and :6880 as
+    scrape targets."""
+    combined = _load_combined_fixture()
+    m = normalize(combined)
+    # Host tier hit rate from the KVBM fixture is 0.75
+    assert abs(m.kvbm_host_hit_rate - 0.75) < 1e-6
+    # Disk tier hit rate is 0.18
+    assert abs(m.kvbm_disk_hit_rate - 0.18) < 1e-6
+    # Object tier hit rate is 0.0 (no S3/GCS tier configured)
+    assert m.kvbm_object_hit_rate == 0.0
+    # Block counter populated
+    assert m.kvbm_offload_d2h == 12500.0
+    assert m.kvbm_onboard_h2d == 9400.0
+
+
+def test_kvbm_fixture_healthy_combined_scrape_produces_no_findings() -> None:
+    """A healthy deployment with working tiered caching (high host hit
+    rate, low eviction signal) must pass all audit checks clean —
+    including KVBM_TIERING_INEFFECTIVE, which should silently no-fire
+    because the data shows tiering is working."""
+    combined = _load_combined_fixture()
+    m = normalize(combined)
+    findings = run_all_checks(m, _healthy_ctx())
+    assert findings == [], (
+        "Combined healthy fixture (main + KVBM) should fire no findings, "
+        f"got: {[f.check_id for f in findings]}"
+    )
+
+
+def test_kvbm_tiering_ineffective_fires_from_fixture_overlay() -> None:
+    """End-to-end: overlay a cold host tier on the KVBM fixture and
+    saturate the GPU cache, then confirm the KVBM_TIERING_INEFFECTIVE
+    check fires through the full pipeline."""
+    combined = _load_combined_fixture()
+    # Push GPU cache into the danger zone
+    combined.raw_metrics["dynamo_component_gpu_cache_usage_percent"] = 0.92
+    # Crash the host tier hit rate to near zero — demotions happening
+    # but no re-use = tier capacity exceeded
+    combined.raw_metrics["kvbm_host_cache_hit_rate"] = 0.01
+    m = normalize(combined)
+    findings = run_all_checks(m, _healthy_ctx())
+    ids = {f.check_id for f in findings}
+    assert "KVBM_TIERING_INEFFECTIVE" in ids
 
 
 # ============================================================================

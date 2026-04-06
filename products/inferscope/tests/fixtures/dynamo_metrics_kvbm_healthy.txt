@@ -1,0 +1,67 @@
+# Synthetic KVBM /metrics exposition representing a healthy Dynamo
+# deployment with KVBM tiering active. KVBM is exposed on a SEPARATE
+# Prometheus endpoint from the main Dynamo frontend — default port
+# 6880 via DYN_KVBM_METRICS_PORT — and only when the operator
+# launches Dynamo with DYN_KVBM_METRICS=true.
+#
+# Metric names are taken from the authoritative Dynamo sources, all
+# cross-checked against the live Grafana dashboard that queries this
+# endpoint:
+#   lib/runtime/src/metrics/prometheus_names.rs (bare constants)
+#   deploy/observability/grafana_dashboards/kvbm.json (runtime PromQL)
+#   deploy/observability/prometheus.yml (:6880 scrape target)
+#
+# Note on naming: KVBM constants are emitted WITHOUT a `dynamo_`
+# prefix. `kvbm_offload_blocks_d2h` is the literal final metric name,
+# not a bare suffix that gets prefixed. This was confirmed by the
+# kvbm.json dashboard which queries the metrics directly as
+# `kvbm_*`. InferScope has always had these names correct.
+#
+# The three KVBM metrics that exist in prometheus_names.rs but are NOT
+# charted in kvbm.json (offload_bytes_object, onboard_bytes_object,
+# object_read_failures, object_write_failures) are omitted here —
+# they're optional tier-3 object-storage telemetry that only appears
+# when the operator configures an S3/GCS tier. A KVBM deployment with
+# only GPU + CPU + SSD tiers won't emit them, and the canary test
+# doesn't enforce their presence.
+#
+# Values represent a healthy tiered cache: GPU tier is the primary
+# hit path (~75% host tier hit rate means the CPU tier is serving as
+# effective spillover for requests that didn't fit on GPU), with a
+# small but nonzero disk tier hit rate for very long sessions.
+
+# HELP kvbm_offload_blocks_d2h GPU-to-host KV block offload operations
+# TYPE kvbm_offload_blocks_d2h counter
+kvbm_offload_blocks_d2h 12500
+
+# HELP kvbm_offload_blocks_h2d Host-to-disk KV block offload operations
+# TYPE kvbm_offload_blocks_h2d counter
+kvbm_offload_blocks_h2d 3200
+
+# HELP kvbm_offload_blocks_d2d Device-to-device KV block offload operations
+# TYPE kvbm_offload_blocks_d2d counter
+kvbm_offload_blocks_d2d 850
+
+# HELP kvbm_onboard_blocks_h2d Host-to-device KV block onboard operations
+# TYPE kvbm_onboard_blocks_h2d counter
+kvbm_onboard_blocks_h2d 9400
+
+# HELP kvbm_onboard_blocks_d2d Device-to-device KV block onboard operations
+# TYPE kvbm_onboard_blocks_d2d counter
+kvbm_onboard_blocks_d2d 820
+
+# HELP kvbm_matched_tokens Tokens reused from KVBM cache
+# TYPE kvbm_matched_tokens counter
+kvbm_matched_tokens 88000000
+
+# HELP kvbm_host_cache_hit_rate CPU tier KV cache hit rate
+# TYPE kvbm_host_cache_hit_rate gauge
+kvbm_host_cache_hit_rate 0.75
+
+# HELP kvbm_disk_cache_hit_rate Disk tier KV cache hit rate
+# TYPE kvbm_disk_cache_hit_rate gauge
+kvbm_disk_cache_hit_rate 0.18
+
+# HELP kvbm_object_cache_hit_rate Object storage tier KV cache hit rate
+# TYPE kvbm_object_cache_hit_rate gauge
+kvbm_object_cache_hit_rate 0.0
