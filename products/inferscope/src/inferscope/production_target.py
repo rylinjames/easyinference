@@ -5,12 +5,20 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal
 
-from inferscope.benchmarks.models import BenchmarkLaneReference
 from inferscope.hardware.gpu_profiles import GPUProfile, get_gpu_profile
 from inferscope.models.registry import ModelVariant, get_model_variant
 
+# NB: BenchmarkLaneReference is imported lazily inside build_lane_reference()
+# to avoid a circular import. The chain is:
+#   optimization.platform_policy -> production_target ->
+#   benchmarks.models (which triggers benchmarks/__init__.py) ->
+#   benchmarks.preflight -> optimization.memory_planner ->
+#   optimization.platform_policy  ← cycle closes here.
+# Under `from __future__ import annotations` all annotations are strings,
+# so TYPE_CHECKING is enough for static type-checkers; only the runtime
+# construction site needs a concrete import.
 if TYPE_CHECKING:
-    from inferscope.benchmarks.models import BenchmarkArtifact
+    from inferscope.benchmarks.models import BenchmarkArtifact, BenchmarkLaneReference
 
 PRODUCTION_TARGET_NAME = "dynamo_long_context_coding"
 SUPPORTED_MODEL = "Kimi-K2.5"
@@ -704,6 +712,8 @@ def build_lane_reference(
     experiment_name: str | None = None,
 ) -> BenchmarkLaneReference:
     """Build typed benchmark-lane provenance metadata."""
+    from inferscope.benchmarks.models import BenchmarkLaneReference  # local import breaks import cycle
+
     contract = resolve_model_support_contract(model_name)
     lane_summary = build_lane_summary(model_name=model_name, workload_pack=workload_pack)
     return BenchmarkLaneReference(
