@@ -41,6 +41,10 @@ def register_profiling_commands(
     @app.command(name="profile-runtime")
     def profile_runtime_cmd(
         endpoint: Annotated[str, typer.Argument(help="Inference endpoint URL (e.g., http://localhost:8000)")],
+        metrics_endpoint: Annotated[
+            str,
+            typer.Option(help="Optional Prometheus base URL if metrics live at a different endpoint"),
+        ] = "",
         gpu_arch: Annotated[str, typer.Option(help="GPU arch (sm_90a, gfx950, etc.)")] = "",
         gpu_name: Annotated[str, typer.Option(help="GPU SKU or deployment label")] = "",
         model_name: Annotated[str, typer.Option(help="Model name for context")] = "",
@@ -76,6 +80,10 @@ def register_profiling_commands(
             bool,
             typer.Option(help="Include persisted metric samples in the profile snapshot"),
         ] = False,
+        scrape_timeout_seconds: Annotated[
+            float,
+            typer.Option(help="HTTP timeout for metrics scraping, useful for cold-start-heavy platforms", min=1.0),
+        ] = 30.0,
         provider: Annotated[str, typer.Option(help="Managed provider preset (fireworks, baseten, huggingface)")] = "",
         metrics_api_key: Annotated[
             str,
@@ -98,6 +106,7 @@ def register_profiling_commands(
         result = asyncio.run(
             profile_runtime(
                 endpoint,
+                metrics_endpoint=(metrics_endpoint or None),
                 gpu_arch=gpu_arch,
                 gpu_name=gpu_name,
                 model_name=model_name,
@@ -126,6 +135,7 @@ def register_profiling_commands(
                 include_tuning_preview=include_tuning_preview,
                 include_raw_metrics=include_raw_metrics,
                 include_samples=include_samples,
+                scrape_timeout_seconds=scrape_timeout_seconds,
             )
         )
         print_result(result)
@@ -133,6 +143,10 @@ def register_profiling_commands(
     @app.command(name="audit")
     def audit_cmd(
         endpoint: Annotated[str, typer.Argument(help="Inference endpoint URL (e.g., http://localhost:8000)")],
+        metrics_endpoint: Annotated[
+            str,
+            typer.Option(help="Optional Prometheus base URL if metrics live at a different endpoint"),
+        ] = "",
         gpu_arch: Annotated[str, typer.Option(help="GPU arch (sm_90a, gfx950, etc.) for richer checks")] = "",
         model_name: Annotated[str, typer.Option(help="Model name for context")] = "",
         model_type: Annotated[str, typer.Option(help="Model type: dense or moe")] = "",
@@ -157,11 +171,16 @@ def register_profiling_commands(
             list[str] | None,
             typer.Option(help="Additional metrics headers as Header=Value. Repeat for multiple headers."),
         ] = None,
+        scrape_timeout_seconds: Annotated[
+            float,
+            typer.Option(help="HTTP timeout for metrics scraping, useful for cold-start-heavy platforms", min=1.0),
+        ] = 30.0,
     ) -> None:
         """Run all audit checks against a live endpoint."""
         result = asyncio.run(
             audit_deployment(
                 endpoint,
+                metrics_endpoint=(metrics_endpoint or None),
                 gpu_arch=gpu_arch,
                 model_name=model_name,
                 model_type=model_type,
@@ -177,6 +196,7 @@ def register_profiling_commands(
                     metrics_auth_header_name=metrics_auth_header_name,
                     metrics_header=metrics_header,
                 ),
+                scrape_timeout_seconds=scrape_timeout_seconds,
             )
         )
         print_result(result)
@@ -184,6 +204,10 @@ def register_profiling_commands(
     @app.command(name="check")
     def check_cmd(
         endpoint: Annotated[str, typer.Argument(help="Inference endpoint URL (e.g., http://localhost:8000)")],
+        metrics_endpoint: Annotated[
+            str,
+            typer.Option(help="Optional Prometheus base URL if metrics live at a different endpoint"),
+        ] = "",
         provider: Annotated[str, typer.Option(help="Managed provider preset (fireworks, baseten, huggingface)")] = "",
         metrics_api_key: Annotated[
             str,
@@ -201,11 +225,16 @@ def register_profiling_commands(
             list[str] | None,
             typer.Option(help="Additional metrics headers as Header=Value. Repeat for multiple headers."),
         ] = None,
+        scrape_timeout_seconds: Annotated[
+            float,
+            typer.Option(help="HTTP timeout for metrics scraping, useful for cold-start-heavy platforms", min=1.0),
+        ] = 30.0,
     ) -> None:
         """Scrape a live endpoint and show health snapshot."""
         result = asyncio.run(
             check_deployment(
                 endpoint,
+                metrics_endpoint=(metrics_endpoint or None),
                 metrics_auth=resolve_metrics_auth(
                     provider=provider,
                     metrics_api_key=metrics_api_key,
@@ -213,6 +242,7 @@ def register_profiling_commands(
                     metrics_auth_header_name=metrics_auth_header_name,
                     metrics_header=metrics_header,
                 ),
+                scrape_timeout_seconds=scrape_timeout_seconds,
             )
         )
         print_result(result)
@@ -220,6 +250,10 @@ def register_profiling_commands(
     @app.command(name="memory")
     def memory_cmd(
         endpoint: Annotated[str, typer.Argument(help="Inference endpoint URL")],
+        metrics_endpoint: Annotated[
+            str,
+            typer.Option(help="Optional Prometheus base URL if metrics live at a different endpoint"),
+        ] = "",
         provider: Annotated[str, typer.Option(help="Managed provider preset (fireworks, baseten, huggingface)")] = "",
         metrics_api_key: Annotated[
             str,
@@ -237,11 +271,16 @@ def register_profiling_commands(
             list[str] | None,
             typer.Option(help="Additional metrics headers as Header=Value. Repeat for multiple headers."),
         ] = None,
+        scrape_timeout_seconds: Annotated[
+            float,
+            typer.Option(help="HTTP timeout for metrics scraping, useful for cold-start-heavy platforms", min=1.0),
+        ] = 30.0,
     ) -> None:
         """Check KV cache memory pressure on a live endpoint."""
         result = asyncio.run(
             check_memory_pressure(
                 endpoint,
+                metrics_endpoint=(metrics_endpoint or None),
                 metrics_auth=resolve_metrics_auth(
                     provider=provider,
                     metrics_api_key=metrics_api_key,
@@ -249,6 +288,7 @@ def register_profiling_commands(
                     metrics_auth_header_name=metrics_auth_header_name,
                     metrics_header=metrics_header,
                 ),
+                scrape_timeout_seconds=scrape_timeout_seconds,
             )
         )
         print_result(result)
@@ -256,6 +296,10 @@ def register_profiling_commands(
     @app.command(name="cache")
     def cache_cmd(
         endpoint: Annotated[str, typer.Argument(help="Inference endpoint URL")],
+        metrics_endpoint: Annotated[
+            str,
+            typer.Option(help="Optional Prometheus base URL if metrics live at a different endpoint"),
+        ] = "",
         provider: Annotated[str, typer.Option(help="Managed provider preset (fireworks, baseten, huggingface)")] = "",
         metrics_api_key: Annotated[
             str,
@@ -273,11 +317,16 @@ def register_profiling_commands(
             list[str] | None,
             typer.Option(help="Additional metrics headers as Header=Value. Repeat for multiple headers."),
         ] = None,
+        scrape_timeout_seconds: Annotated[
+            float,
+            typer.Option(help="HTTP timeout for metrics scraping, useful for cold-start-heavy platforms", min=1.0),
+        ] = 30.0,
     ) -> None:
         """Measure prefix cache hit rate on a live endpoint."""
         result = asyncio.run(
             get_cache_effectiveness(
                 endpoint,
+                metrics_endpoint=(metrics_endpoint or None),
                 metrics_auth=resolve_metrics_auth(
                     provider=provider,
                     metrics_api_key=metrics_api_key,
@@ -285,6 +334,7 @@ def register_profiling_commands(
                     metrics_auth_header_name=metrics_auth_header_name,
                     metrics_header=metrics_header,
                 ),
+                scrape_timeout_seconds=scrape_timeout_seconds,
             )
         )
         print_result(result)

@@ -1,0 +1,184 @@
+{
+  "artifact_version": "2",
+  "benchmark_id": "candidate-example-20260404",
+  "pack_name": "kimi-k2-long-context-coding",
+  "workload_class": "coding",
+  "endpoint": "http://localhost:8000",
+  "metrics_endpoint": "http://localhost:9090",
+  "model": "Kimi-K2.5",
+  "concurrency": 2,
+  "started_at": "2026-04-04T15:10:00Z",
+  "completed_at": "2026-04-04T15:11:04Z",
+  "run_plan": {
+    "source_experiment": "dynamo-aggregated-lmcache-kimi-k2",
+    "topology": {
+      "mode": "single_endpoint"
+    },
+    "cache": {
+      "strategy": "lmcache"
+    },
+    "metrics_targets": [
+      {
+        "name": "frontend",
+        "role": "frontend",
+        "url": "http://localhost:9100"
+      },
+      {
+        "name": "worker",
+        "role": "worker",
+        "url": "http://localhost:9200"
+      }
+    ],
+    "observed_runtime": {
+      "request_throughput_rps": 2.9,
+      "output_throughput_tps": 161.0,
+      "goodput_rps": 2.7,
+      "tpot_ms": {
+        "p95": 64.0
+      },
+      "itl_ms": {
+        "p95": 24.0
+      },
+      "tool_parse_success_rate": 1.0,
+      "cache_effectiveness": {
+        "prefix_cache_hit_rate": 0.53,
+        "prefix_cache_hits": 14
+      },
+      "reliability": {
+        "failed_sessions": 0,
+        "failure_types": {}
+      },
+      "observability": {
+        "missing_metric_prefixes": [],
+        "targets_with_errors": 0
+      }
+    },
+    "workload_ref": "kimi-k2-long-context-coding",
+    "workload_source": {
+      "reference": "kimi-k2-long-context-coding",
+      "resolved_path": "src/inferscope/benchmarks/workloads/kimi-k2-long-context-coding.yaml",
+      "source_kind": "builtin"
+    },
+    "experiment_source": {
+      "reference": "dynamo-aggregated-lmcache-kimi-k2",
+      "resolved_path": "src/inferscope/benchmarks/experiment_specs/dynamo-aggregated-lmcache-kimi-k2.yaml",
+      "source_kind": "builtin"
+    },
+    "reference_lane": {
+      "class_name": "production_validated",
+      "claim_scope": "production_comparable",
+      "model_support_tier": "production_validated",
+      "production_target_name": "dynamo_long_context_coding",
+      "workload_pack": "kimi-k2-long-context-coding",
+      "experiment": "dynamo-aggregated-lmcache-kimi-k2",
+      "summary": "Production-validated InferScope lane. Results can be used for operator-facing comparisons within the current Kimi/Dynamo product scope.",
+      "warnings": []
+    }
+  },
+  "metrics_before": {
+    "captured_at": "2026-04-04T15:09:58Z",
+    "endpoint": "http://localhost:9090",
+    "engine": "dynamo",
+    "target_name": "frontend",
+    "target_role": "frontend",
+    "expected_engine": "dynamo",
+    "scrape_time_ms": 33.0,
+    "error": "",
+    "raw_metrics": {},
+    "normalized_metrics": {
+      "gpu_memory_utilization": 0.86
+    },
+    "samples": []
+  },
+  "metrics_after": {
+    "captured_at": "2026-04-04T15:11:04Z",
+    "endpoint": "http://localhost:9090",
+    "engine": "dynamo",
+    "target_name": "frontend",
+    "target_role": "frontend",
+    "expected_engine": "dynamo",
+    "scrape_time_ms": 34.0,
+    "error": "",
+    "raw_metrics": {},
+    "normalized_metrics": {
+      "gpu_memory_utilization": 0.88
+    },
+    "samples": []
+  },
+  "metrics_before_targets": [],
+  "metrics_after_targets": [],
+  "results": [
+    {
+      "name": "repo-context-1",
+      "session_id": "session-a",
+      "status": "ok",
+      "started_at": "2026-04-04T15:10:01Z",
+      "completed_at": "2026-04-04T15:10:25Z",
+      "elapsed_ms": 24400.0,
+      "ttft_ms": 790.0,
+      "status_code": 200,
+      "prompt_tokens": 6144,
+      "completion_tokens": 256,
+      "total_tokens": 6400,
+      "error": ""
+    },
+    {
+      "name": "repo-context-2",
+      "session_id": "session-b",
+      "status": "ok",
+      "started_at": "2026-04-04T15:10:10Z",
+      "completed_at": "2026-04-04T15:11:00Z",
+      "elapsed_ms": 50300.0,
+      "ttft_ms": 850.0,
+      "status_code": 200,
+      "prompt_tokens": 8192,
+      "completion_tokens": 384,
+      "total_tokens": 8576,
+      "error": ""
+    }
+  ],
+  "summary": {
+    "total_requests": 2,
+    "succeeded": 2,
+    "failed": 0,
+    "concurrency": 2,
+    "wall_time_ms": 64000.0,
+    "latency_avg_ms": 37350.0,
+    "latency_p50_ms": 37350.0,
+    "latency_p95_ms": 1510.0,
+    "latency_p99_ms": 1600.0,
+    "ttft_avg_ms": 820.0,
+    "ttft_p90_ms": 860.0,
+    "ttft_p95_ms": 920.0,
+    "ttft_p99_ms": 960.0,
+    "prompt_tokens": 14336,
+    "completion_tokens": 640,
+    "total_tokens": 14976,
+    "metrics_targets_total": 2,
+    "metrics_targets_with_errors": 0,
+    "metrics_capture_complete": true
+  },
+  "provenance": {
+    "schema_version": "1",
+    "workload": {
+      "reference": "kimi-k2-long-context-coding",
+      "resolved_path": "src/inferscope/benchmarks/workloads/kimi-k2-long-context-coding.yaml",
+      "source_kind": "builtin"
+    },
+    "experiment": {
+      "reference": "dynamo-aggregated-lmcache-kimi-k2",
+      "resolved_path": "src/inferscope/benchmarks/experiment_specs/dynamo-aggregated-lmcache-kimi-k2.yaml",
+      "source_kind": "builtin"
+    },
+    "lane": {
+      "class_name": "production_validated",
+      "claim_scope": "production_comparable",
+      "model_support_tier": "production_validated",
+      "production_target_name": "dynamo_long_context_coding",
+      "workload_pack": "kimi-k2-long-context-coding",
+      "experiment": "dynamo-aggregated-lmcache-kimi-k2",
+      "summary": "Production-validated InferScope lane. Results can be used for operator-facing comparisons within the current Kimi/Dynamo product scope.",
+      "warnings": []
+    }
+  }
+}

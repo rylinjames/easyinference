@@ -1,0 +1,101 @@
+{
+  "baseline": {
+    "path": "baseline-example-20260404-kimi-k2-long-context-coding.json",
+    "pack_name": "kimi-k2-long-context-coding",
+    "endpoint": "http://localhost:8000",
+    "model": "Kimi-K2.5",
+    "lane": {
+      "class": "production_validated",
+      "claim_scope": "production_comparable",
+      "experiment": "dynamo-aggregated-lmcache-kimi-k2"
+    },
+    "summary": {
+      "total_requests": 2,
+      "succeeded": 2,
+      "failed": 0,
+      "concurrency": 2,
+      "wall_time_ms": 72100.0,
+      "latency_avg_ms": 44110.0,
+      "latency_p50_ms": 44110.0,
+      "latency_p95_ms": 1820.0,
+      "latency_p99_ms": 1930.0,
+      "ttft_avg_ms": 980.0,
+      "ttft_p90_ms": 1010.0,
+      "ttft_p95_ms": 1040.0,
+      "ttft_p99_ms": 1080.0,
+      "prompt_tokens": 14336,
+      "completion_tokens": 640,
+      "total_tokens": 14976,
+      "metrics_targets_total": 2,
+      "metrics_targets_with_errors": 0,
+      "metrics_capture_complete": true
+    }
+  },
+  "candidate": {
+    "path": "candidate-example-20260404-kimi-k2-long-context-coding.json",
+    "pack_name": "kimi-k2-long-context-coding",
+    "endpoint": "http://localhost:8000",
+    "model": "Kimi-K2.5",
+    "lane": {
+      "class": "production_validated",
+      "claim_scope": "production_comparable",
+      "experiment": "dynamo-aggregated-lmcache-kimi-k2"
+    },
+    "summary": {
+      "total_requests": 2,
+      "succeeded": 2,
+      "failed": 0,
+      "concurrency": 2,
+      "wall_time_ms": 64000.0,
+      "latency_avg_ms": 37350.0,
+      "latency_p50_ms": 37350.0,
+      "latency_p95_ms": 1510.0,
+      "latency_p99_ms": 1600.0,
+      "ttft_avg_ms": 820.0,
+      "ttft_p90_ms": 860.0,
+      "ttft_p95_ms": 920.0,
+      "ttft_p99_ms": 960.0,
+      "prompt_tokens": 14336,
+      "completion_tokens": 640,
+      "total_tokens": 14976,
+      "metrics_targets_total": 2,
+      "metrics_targets_with_errors": 0,
+      "metrics_capture_complete": true
+    }
+  },
+  "compatibility": {
+    "comparable": true,
+    "warnings": [],
+    "differing_fields": []
+  },
+  "deltas": {
+    "latency_p95_ms": -310.0,
+    "ttft_p90_ms": -150.0,
+    "ttft_p95_ms": -120.0,
+    "ttft_p99_ms": -120.0,
+    "latency_avg_ms": -6760.0,
+    "wall_time_ms": -8100.0,
+    "succeeded": 0,
+    "failed": 0,
+    "total_tokens": 0,
+    "request_throughput_rps": 0.5,
+    "output_throughput_tps": 23.0,
+    "goodput_rps": 0.5,
+    "tpot_p95_ms": -14.0,
+    "itl_p95_ms": -7.0,
+    "tool_parse_success_rate": 0.0,
+    "prefix_cache_hit_rate": 0.12000000000000005,
+    "prefix_cache_hits": 5.0
+  },
+  "ratios": {
+    "latency_p95": 0.8296703296703297,
+    "ttft_p90": 0.8514851485148515,
+    "ttft_p95": 0.8846153846153846,
+    "ttft_p99": 0.8888888888888888,
+    "wall_time": 0.8876560332871013,
+    "request_throughput": 1.2083333333333333,
+    "output_throughput": 1.1666666666666667,
+    "goodput": 1.2272727272727273
+  },
+  "summary": "p95 latency faster by 310.0 ms | p95 TTFT lower by 120.0 ms"
+}

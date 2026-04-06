@@ -12,7 +12,7 @@ InferScope had drifted toward three bad shapes at once:
 
 The correct product shape is narrower:
 
-> InferScope should explain why a real deployment misses frontier performance on KV reuse, offload, and disaggregated serving, then point to the next remediation step.
+> InferScope should explain why a real deployment misses frontier performance on KV reuse, offload, and disaggregated serving, then point to the next recommended step.
 
 ## What is worth keeping
 
@@ -131,7 +131,7 @@ High-value missing pieces remain:
 - phase-aware telemetry for prefill, decode, and handoff
 - stronger KV/offload/disaggregation metrics in artifacts
 - reproducibility and provenance manifests with stronger config/trace/version data
-- diagnostics that map runtime + probe evidence into explicit remediation suggestions
+- diagnostics that map runtime + probe evidence into explicit recommended next steps
 - reporting that explains frontier gap, not just latency deltas
 
 ## Design rules going forward
@@ -141,6 +141,7 @@ High-value missing pieces remain:
 3. Do not expand benchmark breadth for its own sake.
 4. Prefer a small number of strong probes over a broad catalog of weak ones.
 5. Keep ISB-1 as the benchmark-standard owner and InferScope as the operator-diagnostics owner.
+6. Keep automated optimization, rollout, and rollback outside InferScope.
 
 ## Target architecture
 

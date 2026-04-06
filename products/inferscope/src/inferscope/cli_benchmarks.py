@@ -18,7 +18,12 @@ from inferscope.benchmarks import (
 )
 from inferscope.benchmarks.probe_resolution import resolve_probe_plan
 from inferscope.endpoint_auth import parse_header_values
-from inferscope.production_target import build_benchmark_readiness_summary, build_production_contract
+from inferscope.production_target import (
+    build_benchmark_readiness_summary,
+    build_lane_summary,
+    build_production_contract,
+    validate_production_lane_artifact,
+)
 
 
 def _parse_json_option(raw: str, *, option_name: str) -> dict[str, Any] | None:
@@ -84,6 +89,14 @@ def register_benchmark_commands(
             str,
             typer.Option(help="Optional repo/context file used for procedural workload expansion"),
         ] = "",
+        model_artifact_path: Annotated[
+            str,
+            typer.Option(help="Optional local model artifact or engine directory to validate before launch"),
+        ] = "",
+        artifact_manifest: Annotated[
+            str,
+            typer.Option(help="Optional JSON/YAML artifact manifest for strict compatibility checks"),
+        ] = "",
     ):
         """Resolve the supported InferScope probe into a concrete benchmark run plan."""
         try:
@@ -107,6 +120,8 @@ def register_benchmark_commands(
                 synthetic_output_tokens=synthetic_output_tokens,
                 synthetic_seed=synthetic_seed,
                 context_file=context_file,
+                model_artifact_path=model_artifact_path,
+                artifact_manifest=artifact_manifest,
                 allow_context_file=True,
             )
         except Exception as exc:  # noqa: BLE001
@@ -115,8 +130,17 @@ def register_benchmark_commands(
         print_result(
             {
                 "summary": f"Resolved probe plan for {resolved.workload_reference}",
+                "lane": build_lane_summary(
+                    model_name=resolved.run_plan.model,
+                    workload_pack=resolved.workload_pack.name,
+                ),
                 "run_plan": resolved.run_plan.model_dump(mode="json"),
                 "support": resolved.support.model_dump(mode="json"),
+                "preflight_validation": (
+                    resolved.run_plan.preflight_validation.model_dump(mode="json")
+                    if resolved.run_plan.preflight_validation is not None
+                    else None
+                ),
                 "production_target": build_production_contract(),
             }
         )
@@ -165,6 +189,14 @@ def register_benchmark_commands(
         context_file: Annotated[
             str,
             typer.Option(help="Optional repo/context file used for procedural workload expansion"),
+        ] = "",
+        model_artifact_path: Annotated[
+            str,
+            typer.Option(help="Optional local model artifact or engine directory to validate before launch"),
+        ] = "",
+        artifact_manifest: Annotated[
+            str,
+            typer.Option(help="Optional JSON/YAML artifact manifest for strict compatibility checks"),
         ] = "",
         provider: Annotated[
             str,
@@ -226,6 +258,8 @@ def register_benchmark_commands(
                 synthetic_output_tokens=synthetic_output_tokens,
                 synthetic_seed=synthetic_seed,
                 context_file=context_file,
+                model_artifact_path=model_artifact_path,
+                artifact_manifest=artifact_manifest,
                 allow_context_file=True,
             )
         except Exception as exc:  # noqa: BLE001
@@ -275,8 +309,17 @@ def register_benchmark_commands(
                     )
                 ),
                 "artifact_path": str(saved_path),
+                "lane": build_lane_summary(
+                    model_name=resolved.run_plan.model,
+                    workload_pack=resolved.workload_pack.name,
+                ),
                 "run_plan": resolved.run_plan.model_dump(mode="json"),
                 "support": resolved.support.model_dump(mode="json"),
+                "preflight_validation": (
+                    resolved.run_plan.preflight_validation.model_dump(mode="json")
+                    if resolved.run_plan.preflight_validation is not None
+                    else None
+                ),
                 "observed_runtime": (artifact.run_plan or {}).get("observed_runtime", {}),
                 "production_readiness": build_benchmark_readiness_summary(artifact),
                 "production_target": build_production_contract(),
@@ -296,3 +339,24 @@ def register_benchmark_commands(
         except Exception as exc:  # noqa: BLE001
             raise typer.BadParameter(str(exc)) from exc
         print_result(compare_benchmark_artifacts(baseline_artifact, candidate_artifact))
+
+    @app.command(name="validate-production-lane")
+    def validate_production_lane_cmd(
+        candidate: Annotated[Path, typer.Argument(help="Candidate benchmark artifact JSON path")],
+        baseline: Annotated[
+            Path | None,
+            typer.Option(help="Optional baseline benchmark artifact JSON path for comparison checks"),
+        ] = None,
+    ):
+        """Validate that an artifact belongs to the canonical production lane."""
+        try:
+            candidate_artifact = load_benchmark_artifact(candidate)
+            baseline_artifact = load_benchmark_artifact(baseline) if baseline is not None else None
+        except Exception as exc:  # noqa: BLE001
+            raise typer.BadParameter(str(exc)) from exc
+        print_result(
+            validate_production_lane_artifact(
+                candidate_artifact,
+                baseline=baseline_artifact,
+            )
+        )

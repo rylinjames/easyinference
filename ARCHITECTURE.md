@@ -2,6 +2,8 @@
 
 EasyInference is a two-product monorepo with a hard boundary between benchmark standardization and operator diagnostics.
 
+The broader product strategy can still include a separate optimization product or repo outside this monorepo. That third lane should not be collapsed back into EasyInference.
+
 - **ISB-1** is the reproducible benchmark standard
 - **InferScope** is the operator-facing runtime profiling and narrow probe product
 
@@ -12,9 +14,11 @@ The repo is meant to be complementary to public frontier benchmarking, not a clo
 - **InferenceX** owns the broad public frontier benchmark layer
 - **ISB-1** owns reproducible benchmark methodology, configs, harnesses, analysis, and publication in this repo
 - **InferScope** owns deployment-specific profiling, probe execution, and artifact comparison
+- **Axion Optimize** or a separate optimization repo can own automated tuning, deployment change execution, and managed optimization workflows outside this monorepo
 
 If a feature looks like generic benchmark infrastructure, it should default toward **ISB-1**.
-If a feature looks like deployment diagnosis or remediation, it should default toward **InferScope**.
+If a feature looks like deployment diagnosis or advisory recommendation, it should default toward **InferScope**.
+If a feature executes changes, manages rollouts, or owns optimization-session lifecycle, it should default outside EasyInference.
 
 ## Repository structure
 
@@ -54,9 +58,11 @@ InferScope owns the operator-facing product:
 - deployment checks and bottleneck summaries
 - narrow benchmark probe resolution and execution
 - artifact comparison for deployment changes
+- advisory next-step recommendations based on that evidence
 - MCP and CLI presentation layers for those workflows
 
 InferScope should not be used to rebuild a second benchmark platform beside ISB-1.
+It should also not become the closed-loop optimization or deployment-orchestration product.
 
 ## InferScope internal boundary
 
@@ -94,6 +100,7 @@ It does not own product logic.
 Keep the separation hard:
 
 - benchmark breadth and benchmark-standard infrastructure belong in **ISB-1**
-- deployment-specific diagnostics and remediation workflows belong in **InferScope**
+- deployment-specific diagnostics and advisory remediation belong in **InferScope**
+- automated optimization, rollout, rollback, and managed deployment belong outside EasyInference
 
 That separation is what keeps the monorepo strategically coherent.

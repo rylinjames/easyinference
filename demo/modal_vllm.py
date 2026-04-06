@@ -1,4 +1,4 @@
-"""Deploy vLLM on Modal for EasyInference smoke testing (Qwen2.5-7B on A10G).
+"""Deploy vLLM on Modal for EasyInference low-cost smoke validation.
 
 Usage:
     modal deploy demo/modal_vllm.py
@@ -10,14 +10,38 @@ Cost controls (enforced — not optional):
 Endpoint URL:
     https://<workspace>--easyinference-demo-serve.modal.run
 
+What this deploy guarantees:
+    /v1/models         OpenAI-compatible model discovery
+    /v1/chat/completions
+    /metrics           Prometheus metrics emitted by the embedded vLLM server
+
+Served model:
+    Qwen2.5-7B-Instruct (backed by Qwen/Qwen2.5-7B-Instruct) on 1x A10G
+
+Warm the endpoint once:
+    curl -sS https://<workspace>--easyinference-demo-serve.modal.run/v1/models
+
 Run a quick smoke test:
     cd products/isb1
-    uv run isb1 quick-bench https://<url>/v1 --workload simple --requests 10
+    uv sync --dev --no-editable
+    uv run --no-sync isb1 quick-bench \
+      https://<url> \
+      --model-id Qwen2.5-7B-Instruct \
+      --workload coding \
+      --requests 1 \
+      --duration 120
+
+InferScope smoke lane:
+    cd products/inferscope
+    uv sync --dev --no-editable
+    uv run inferscope benchmark-plan coding-smoke https://<url> --gpu a10g --num-gpus 1
+    uv run inferscope profile-runtime https://<url> --metrics-endpoint https://<url> --scrape-timeout-seconds 90
 """
 
 import modal
 
 MODEL_ID = "Qwen/Qwen2.5-7B-Instruct"
+SERVED_MODEL_NAME = "Qwen2.5-7B-Instruct"
 
 app = modal.App("easyinference-demo")
 
@@ -43,6 +67,7 @@ def serve():
     subprocess.Popen([
         "python", "-m", "vllm.entrypoints.openai.api_server",
         "--model", MODEL_ID,
+        "--served-model-name", SERVED_MODEL_NAME,
         "--port", "8000",
         "--gpu-memory-utilization", "0.90",
         "--enable-prefix-caching",

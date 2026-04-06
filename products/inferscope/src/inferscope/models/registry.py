@@ -131,6 +131,23 @@ _register(
 
 _register(
     ModelVariant(
+        name="Qwen2.5-7B-Instruct",
+        family="Qwen 2.5",
+        model_class=ModelClass.DENSE_GQA,
+        params_total_b=7.0,
+        params_active_b=7.0,
+        model_type="dense",
+        context_length=131072,
+        attention_type="GQA",
+        kv_heads=4,
+        head_dim=128,
+        layers=28,
+        serving={"tp_fp16": 1, "tp_fp8": 1},
+    )
+)
+
+_register(
+    ModelVariant(
         name="Qwen3.5-72B",
         family="Qwen 3.5",
         model_class=ModelClass.QWEN35_HYBRID,

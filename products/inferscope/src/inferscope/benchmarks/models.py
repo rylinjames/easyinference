@@ -13,11 +13,16 @@ from uuid import uuid4
 import yaml  # type: ignore[import-untyped]
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from inferscope.models.registry import get_model_variant
+from inferscope.optimization.serving_profile import ModelClass
 from inferscope.telemetry.models import MetricSampleRecord, MetricSnapshot
 
 __all__ = [
     "BenchmarkArtifact",
+    "BenchmarkArtifactProvenance",
+    "BenchmarkLaneReference",
     "BenchmarkRequestResult",
+    "BenchmarkSourceReference",
     "BenchmarkSummary",
     "ChatMessage",
     "MetricSampleRecord",
@@ -47,6 +52,10 @@ def sanitize_for_json(value: Any) -> Any:
     if isinstance(value, list):
         return [sanitize_for_json(item) for item in value]
     return value
+
+
+def _known_model_classes() -> set[str]:
+    return {model_class.value for model_class in ModelClass}
 
 
 class ChatMessage(BaseModel):
@@ -111,6 +120,26 @@ class WorkloadPack(BaseModel):
             raise ValueError("WorkloadPack.requests must contain at least one request")
         if not self.endpoint_path.startswith("/"):
             raise ValueError("WorkloadPack.endpoint_path must start with '/'")
+        invalid_model_classes = sorted(set(self.target_model_classes) - _known_model_classes())
+        if invalid_model_classes:
+            raise ValueError(
+                "WorkloadPack.target_model_classes contains unknown classes: "
+                f"{', '.join(invalid_model_classes)}"
+            )
+        if self.model:
+            variant = get_model_variant(self.model)
+            if variant is None:
+                raise ValueError(
+                    "WorkloadPack.model "
+                    f"'{self.model}' does not resolve to a known model variant. "
+                    "Register the model first or fix the workload metadata."
+                )
+            if self.target_model_classes and variant.model_class.value not in self.target_model_classes:
+                raise ValueError(
+                    "WorkloadPack.model "
+                    f"'{variant.name}' resolves to class '{variant.model_class.value}', "
+                    "which is not allowed by target_model_classes."
+                )
         return self
 
     @classmethod
@@ -189,6 +218,50 @@ class BenchmarkSummary(BaseModel):
     metrics_capture_complete: bool = True
 
 
+class BenchmarkSourceReference(BaseModel):
+    """How a workload or experiment spec was resolved for this run."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    reference: str
+    resolved_path: str
+    source_kind: Literal["builtin", "file"]
+
+
+class BenchmarkLaneReference(BaseModel):
+    """Product-facing lane metadata attached to a resolved benchmark run."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    class_name: Literal[
+        "production_validated",
+        "benchmark_supported",
+        "preview_smoke",
+    ]
+    claim_scope: Literal[
+        "production_comparable",
+        "benchmark_comparison_only",
+        "toolchain_validation_only",
+    ]
+    model_support_tier: str
+    production_target_name: str | None = None
+    workload_pack: str
+    experiment: str | None = None
+    summary: str
+    warnings: list[str] = Field(default_factory=list)
+
+
+class BenchmarkArtifactProvenance(BaseModel):
+    """Stable provenance bundle for artifact interpretation and export."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: str = "1"
+    workload: BenchmarkSourceReference
+    experiment: BenchmarkSourceReference | None = None
+    lane: BenchmarkLaneReference | None = None
+
+
 class BenchmarkArtifact(BaseModel):
     """Serializable artifact for one benchmark run."""
 
@@ -205,6 +278,7 @@ class BenchmarkArtifact(BaseModel):
     started_at: str
     completed_at: str
     run_plan: dict[str, Any] | None = None
+    provenance: BenchmarkArtifactProvenance | None = None
     metrics_before: MetricSnapshot | None = None
     metrics_after: MetricSnapshot | None = None
     metrics_before_targets: list[MetricSnapshot] = Field(default_factory=list)

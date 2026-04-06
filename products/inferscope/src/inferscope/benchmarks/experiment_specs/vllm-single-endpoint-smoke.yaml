@@ -1,0 +1,25 @@
+version: "1"
+name: vllm-single-endpoint-smoke
+description: Budget single-endpoint vLLM smoke lane for low-cost GPU and serverless validation.
+engine: vllm
+workload: coding-smoke
+benchmark_role: smoke
+target_gpu_families: [ampere, hopper, hopper_pcie, hopper_grace, blackwell, blackwell_ultra, blackwell_grace, blackwell_ultra_grace]
+target_model_classes: [dense_gqa]
+focus_areas: [smoke, observability, endpoint_validation]
+topology:
+  mode: single_endpoint
+  session_routing: sticky
+  session_header_name: X-Session-ID
+  request_target_name: primary
+cache:
+  strategy: prefix_only
+  tiers: [gpu_hbm]
+  session_affinity: true
+  prefix_cache_expected: true
+metrics_targets:
+  - name: primary
+    role: primary
+    endpoint_source: metrics_endpoint
+    expected_engine: vllm
+tags: [vllm, smoke, single-endpoint, low-cost]

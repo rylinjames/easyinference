@@ -191,6 +191,29 @@ def _cache_strategy(artifact: BenchmarkArtifact) -> str:
     return "unknown"
 
 
+def _lane_class(artifact: BenchmarkArtifact) -> str:
+    if artifact.provenance is not None and artifact.provenance.lane is not None:
+        return artifact.provenance.lane.class_name
+    return "unknown"
+
+
+def _claim_scope(artifact: BenchmarkArtifact) -> str:
+    if artifact.provenance is not None and artifact.provenance.lane is not None:
+        return artifact.provenance.lane.claim_scope
+    return "unknown"
+
+
+def _experiment_name(artifact: BenchmarkArtifact) -> str:
+    if (
+        artifact.provenance is not None
+        and artifact.provenance.lane is not None
+        and artifact.provenance.lane.experiment
+    ):
+        return artifact.provenance.lane.experiment
+    source_experiment = _run_plan_field(artifact, "source_experiment", "")
+    return str(source_experiment)
+
+
 def _metrics_roles(artifact: BenchmarkArtifact) -> list[str]:
     if artifact.run_plan and isinstance(artifact.run_plan.get("metrics_targets"), list):
         role_list = [
@@ -222,6 +245,9 @@ def compare_benchmark_artifacts(
         "workload_class": (baseline.workload_class, candidate.workload_class),
         "model": (baseline.model, candidate.model),
         "concurrency": (baseline.concurrency, candidate.concurrency),
+        "lane_class": (_lane_class(baseline), _lane_class(candidate)),
+        "claim_scope": (_claim_scope(baseline), _claim_scope(candidate)),
+        "experiment": (_experiment_name(baseline), _experiment_name(candidate)),
         "topology_mode": (_topology_mode(baseline), _topology_mode(candidate)),
         "cache_strategy": (_cache_strategy(baseline), _cache_strategy(candidate)),
         "metrics_roles": (_metrics_roles(baseline), _metrics_roles(candidate)),
@@ -240,6 +266,11 @@ def compare_benchmark_artifacts(
             "pack_name": baseline.pack_name,
             "endpoint": baseline.endpoint,
             "model": baseline.model,
+            "lane": {
+                "class": _lane_class(baseline),
+                "claim_scope": _claim_scope(baseline),
+                "experiment": _experiment_name(baseline),
+            },
             "summary": baseline_summary.model_dump(mode="json"),
         },
         "candidate": {
@@ -247,6 +278,11 @@ def compare_benchmark_artifacts(
             "pack_name": candidate.pack_name,
             "endpoint": candidate.endpoint,
             "model": candidate.model,
+            "lane": {
+                "class": _lane_class(candidate),
+                "claim_scope": _claim_scope(candidate),
+                "experiment": _experiment_name(candidate),
+            },
             "summary": candidate_summary.model_dump(mode="json"),
         },
         "compatibility": {

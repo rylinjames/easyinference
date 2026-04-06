@@ -1,0 +1,57 @@
+version: "1"
+name: coding-smoke
+description: Low-cost coding smoke workload for single-endpoint validation on inexpensive GPUs and serverless platforms.
+workload_class: coding
+benchmark_role: smoke
+target_gpu_families: [ampere, hopper, hopper_pcie, hopper_grace, blackwell, blackwell_ultra, blackwell_grace, blackwell_ultra_grace]
+target_model_classes: [dense_gqa]
+focus_areas: [smoke, endpoint_validation, cold_start]
+model: Qwen2.5-7B-Instruct
+concurrency: 1
+stream: true
+tags:
+  - coding
+  - smoke
+  - low-cost
+requests:
+  - name: coding-smoke-repo-summary
+    session_id: coding-smoke-session-1
+    max_tokens: 160
+    metadata:
+      approx_context_tokens: 2048
+    messages:
+      - role: system
+        content: |
+          You are a concise coding assistant. Prefer short, direct implementation notes.
+
+          # === REPO CONTEXT START ===
+          src/api.py: request routing and auth
+          src/cache.py: prefix cache and KV allocation
+          src/metrics.py: Prometheus counters and histograms
+          # === REPO CONTEXT END ===
+      - role: user
+        content: |
+          Identify the first low-risk change to reduce cold-start latency for this service.
+  - name: coding-smoke-follow-up
+    session_id: coding-smoke-session-1
+    max_tokens: 220
+    metadata:
+      approx_context_tokens: 2048
+    messages:
+      - role: system
+        content: |
+          You are a concise coding assistant. Prefer short, direct implementation notes.
+
+          # === REPO CONTEXT START ===
+          src/api.py: request routing and auth
+          src/cache.py: prefix cache and KV allocation
+          src/metrics.py: Prometheus counters and histograms
+          # === REPO CONTEXT END ===
+      - role: user
+        content: |
+          Identify the first low-risk change to reduce cold-start latency for this service.
+      - role: assistant
+        content: Pre-warm the model and keep the metrics path responsive during container startup.
+      - role: user
+        content: |
+          Give the minimal validation checklist for that change.

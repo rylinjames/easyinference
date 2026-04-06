@@ -9,9 +9,9 @@ from inferscope.server_profiling import register_profiling_tools
 
 mcp = FastMCP(
     "inferscope",
-    instructions="""InferScope is scoped to one operator-facing production lane:
-    Kimi-K2.5 long-context coding on Hopper/Blackwell, with Dynamo as the production target
-    and vLLM as the comparison lane.
+    instructions="""InferScope is scoped to one operator-facing production lane plus a small public benchmark catalog:
+    Kimi-K2.5 long-context coding on Hopper/Blackwell, with Dynamo as the production target,
+    plus benchmark-supported public model lanes including single-endpoint vLLM on one H100-class GPU.
 
     The MCP surface is intentionally narrow:
     - return the supported production contract

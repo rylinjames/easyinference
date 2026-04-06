@@ -18,6 +18,7 @@ from rich.panel import Panel
 from rich.syntax import Syntax
 
 from inferscope.cli_benchmarks import register_benchmark_commands
+from inferscope.cli_experiments import register_experiment_commands
 from inferscope.cli_profiling import register_profiling_commands
 from inferscope.endpoint_auth import parse_header_values, resolve_auth_config
 from inferscope.tools.hardware_intel import compare_gpus, get_gpu_specs
@@ -346,6 +347,7 @@ def evaluate(
 
 register_profiling_commands(app, print_result=_print_result, resolve_metrics_auth=_resolve_metrics_auth)
 register_benchmark_commands(app, print_result=_print_result)
+register_experiment_commands(app, print_result=_print_result, resolve_metrics_auth=_resolve_metrics_auth)
 
 
 @app.command()

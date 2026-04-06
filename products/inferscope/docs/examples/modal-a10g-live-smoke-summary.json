@@ -1,0 +1,51 @@
+{
+  "name": "modal-a10g-live-smoke",
+  "date": "2026-04-05",
+  "status": "validated-locally",
+  "platform": "modal",
+  "endpoint": "https://hikaflow--easyinference-demo-serve.modal.run",
+  "served_model": {
+    "hf_model": "Qwen/Qwen2.5-7B-Instruct",
+    "engine": "vllm",
+    "gpu": "a10g",
+    "num_gpus": 1
+  },
+  "inferscope": {
+    "workload_pack": "coding-smoke",
+    "benchmark_plan": {
+      "status": "degraded",
+      "reason": "Preview smoke lane on vLLM/A10G rather than the production-validated Kimi lane."
+    },
+    "runtime_profile": {
+      "status": "healthy",
+      "scrape_timeout_seconds": 90,
+      "metrics_surface": "/metrics",
+      "scrape_time_seconds": 39.8
+    }
+  },
+  "isb1": {
+    "simple_quick_bench": {
+      "requests": 1,
+      "duration_seconds": 120,
+      "completed": 1,
+      "failed": 0,
+      "wall_time_seconds": 9.0,
+      "ttft_p50_seconds": 6.338,
+      "throughput_tokens_per_second": 7.0
+    },
+    "coding_quick_bench": {
+      "requests": 1,
+      "duration_seconds": 120,
+      "completed": 1,
+      "failed": 0,
+      "wall_time_seconds": 25.5,
+      "ttft_p50_seconds": 0.992,
+      "throughput_tokens_per_second": 28.0
+    }
+  },
+  "limitations": [
+    "This was a serverless smoke validation, not a publishable production benchmark.",
+    "Latency was sensitive to cold starts and serverless scheduling.",
+    "Only summary metrics were preserved locally; no full raw benchmark artifact was exported for this Modal run."
+  ]
+}

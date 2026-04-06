@@ -107,6 +107,7 @@ class RuntimeAnalysisBundle:
 async def analyze_runtime(
     endpoint: str,
     *,
+    metrics_endpoint: str | None = None,
     context_hints: RuntimeContextHints | None = None,
     current_scheduler: dict[str, Any] | None = None,
     current_cache: dict[str, Any] | None = None,
@@ -118,14 +119,16 @@ async def analyze_runtime(
     include_tuning_preview: bool = False,
     include_raw_metrics: bool = False,
     include_samples: bool = False,
+    scrape_timeout_seconds: float = 30.0,
 ) -> RuntimeAnalysisBundle:
     """Capture and analyze a runtime endpoint once."""
     hints = context_hints or RuntimeContextHints()
     captured = await capture_endpoint_telemetry(
-        endpoint,
+        metrics_endpoint or endpoint,
         allow_private=allow_private,
         metrics_auth=metrics_auth,
         include_samples=include_samples,
+        scrape_timeout_seconds=scrape_timeout_seconds,
     )
 
     snapshot = captured.snapshot.model_copy(
@@ -220,6 +223,7 @@ async def analyze_runtime(
 async def build_runtime_profile(
     endpoint: str,
     *,
+    metrics_endpoint: str | None = None,
     context_hints: RuntimeContextHints | None = None,
     current_scheduler: dict[str, Any] | None = None,
     current_cache: dict[str, Any] | None = None,
@@ -229,10 +233,12 @@ async def build_runtime_profile(
     include_tuning_preview: bool = True,
     include_raw_metrics: bool = False,
     include_samples: bool = False,
+    scrape_timeout_seconds: float = 30.0,
 ) -> RuntimeProfileReport:
     """Build the full runtime profile report."""
     bundle = await analyze_runtime(
         endpoint,
+        metrics_endpoint=metrics_endpoint,
         context_hints=context_hints,
         current_scheduler=current_scheduler,
         current_cache=current_cache,
@@ -244,6 +250,7 @@ async def build_runtime_profile(
         include_tuning_preview=include_tuning_preview,
         include_raw_metrics=include_raw_metrics,
         include_samples=include_samples,
+        scrape_timeout_seconds=scrape_timeout_seconds,
     )
     if bundle.snapshot.error:
         raise RuntimeError(bundle.snapshot.error)

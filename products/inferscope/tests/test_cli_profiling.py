@@ -25,6 +25,58 @@ def test_cli_profile_runtime_command_exists_and_runs(monkeypatch) -> None:
     assert "Runtime profile ok" in result.stdout
 
 
+def test_cli_profile_runtime_failure_includes_next_steps(monkeypatch) -> None:
+    async def fake_profile_runtime(*args, **kwargs):
+        del args, kwargs
+        return {
+            "error": "metrics scrape failed: 401 Unauthorized",
+            "summary": "❌ Runtime profiling failed: metrics scrape failed: 401 Unauthorized",
+            "confidence": 0.0,
+            "endpoint": "http://localhost:8000",
+            "next_steps": [
+                "Check the request or metrics auth configuration and retry with the correct header scheme.",
+                "See products/inferscope/docs/QUICKSTART.md for the current supported InferScope lane.",
+            ],
+        }
+
+    monkeypatch.setattr("inferscope.cli_profiling.profile_runtime", fake_profile_runtime)
+
+    result = runner.invoke(app, ["profile-runtime", "http://localhost:8000"])
+
+    assert result.exit_code == 0, result.stdout
+    assert "Runtime profiling failed" in result.stdout
+    assert "next_steps" in result.stdout
+    assert "auth configuration" in result.stdout
+
+
+def test_cli_profile_runtime_forwards_metrics_endpoint_and_timeout(monkeypatch) -> None:
+    captured: dict[str, object] = {}
+
+    async def fake_profile_runtime(*args, **kwargs):
+        captured["args"] = args
+        captured["kwargs"] = kwargs
+        return {"summary": "Runtime profile ok", "confidence": 0.9, "endpoint": "http://localhost:8000"}
+
+    monkeypatch.setattr("inferscope.cli_profiling.profile_runtime", fake_profile_runtime)
+
+    result = runner.invoke(
+        app,
+        [
+            "profile-runtime",
+            "http://localhost:8000",
+            "--metrics-endpoint",
+            "http://localhost:9000",
+            "--scrape-timeout-seconds",
+            "90",
+        ],
+    )
+
+    assert result.exit_code == 0, result.stdout
+    assert captured["args"] == ("http://localhost:8000",)
+    assert captured["kwargs"]["metrics_endpoint"] == "http://localhost:9000"
+    assert captured["kwargs"]["scrape_timeout_seconds"] == 90.0
+
+
 def test_cli_profile_still_routes_to_model_intel(monkeypatch) -> None:
     monkeypatch.setattr(
         "inferscope.cli.get_model_profile",

@@ -5,8 +5,32 @@ from __future__ import annotations
 from typing import Any
 
 from inferscope.endpoint_auth import EndpointAuthConfig
+from inferscope.production_target import supported_configuration_hint
 from inferscope.profiling.models import RuntimeContextHints
 from inferscope.profiling.runtime import build_runtime_profile
+
+
+def _profile_error_next_steps(error: str) -> list[str]:
+    lowered = error.lower()
+    if "metrics" in lowered or "scrape" in lowered:
+        return [
+            "Confirm the endpoint exposes a Prometheus-style /metrics surface and that it is "
+            "reachable from this machine.",
+            "If the request API and metrics surface live at different URLs, rerun with --metrics-endpoint.",
+            "If the platform cold-starts containers, rerun with a larger "
+            "--scrape-timeout-seconds value after warming the endpoint.",
+            "If metrics are authenticated, pass the correct metrics auth settings or headers.",
+            supported_configuration_hint(),
+        ]
+    if "auth" in lowered or "401" in lowered or "403" in lowered:
+        return [
+            "Check the request or metrics auth configuration and retry with the correct header scheme.",
+            supported_configuration_hint(),
+        ]
+    return [
+        "Confirm the endpoint is reachable and returns metrics before retrying.",
+        supported_configuration_hint(),
+    ]
 
 
 def _profile_error(endpoint: str, error: str) -> dict[str, Any]:
@@ -14,6 +38,7 @@ def _profile_error(endpoint: str, error: str) -> dict[str, Any]:
         "error": error,
         "endpoint": endpoint,
         "summary": f"❌ Runtime profiling failed: {error}",
+        "next_steps": _profile_error_next_steps(error),
         "confidence": 0.0,
         "evidence": "scrape_failure",
     }
@@ -22,6 +47,7 @@ def _profile_error(endpoint: str, error: str) -> dict[str, Any]:
 async def profile_runtime(
     endpoint: str,
     *,
+    metrics_endpoint: str | None = None,
     engine: str = "",
     gpu_arch: str = "",
     gpu_name: str = "",
@@ -45,6 +71,7 @@ async def profile_runtime(
     include_tuning_preview: bool = True,
     include_raw_metrics: bool = False,
     include_samples: bool = False,
+    scrape_timeout_seconds: float = 30.0,
 ) -> dict[str, Any]:
     """Build the unified runtime profile payload."""
     hints = RuntimeContextHints(
@@ -67,6 +94,7 @@ async def profile_runtime(
     try:
         report = await build_runtime_profile(
             endpoint,
+            metrics_endpoint=metrics_endpoint,
             context_hints=hints,
             current_scheduler=current_scheduler,
             current_cache=current_cache,
@@ -76,6 +104,7 @@ async def profile_runtime(
             include_tuning_preview=include_tuning_preview,
             include_raw_metrics=include_raw_metrics,
             include_samples=include_samples,
+            scrape_timeout_seconds=scrape_timeout_seconds,
         )
     except RuntimeError as exc:
         return _profile_error(endpoint, str(exc))

@@ -250,6 +250,7 @@ async def scrape_metrics(
     *,
     metrics_path: str = "/metrics",
     auth: EndpointAuthConfig | None = None,
+    timeout_seconds: float = 30.0,
 ) -> ScrapeResult:
     """Scrape Prometheus metrics from an inference engine endpoint.
 
@@ -276,7 +277,7 @@ async def scrape_metrics(
         return result
 
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(timeout_seconds)) as client:
             resp = await client.get(metrics_url, headers=build_auth_headers(auth))
             resp.raise_for_status()
             text = resp.text

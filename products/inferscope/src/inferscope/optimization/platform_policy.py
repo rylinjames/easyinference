@@ -211,8 +211,11 @@ def resolve_engine_support(engine: EngineType | str, gpu: GPUProfile, multi_node
         if not is_target_gpu(gpu):
             return EngineSupport(
                 engine="vllm",
-                tier=EngineSupportTier.UNSUPPORTED,
-                reason="Supported GPUs are limited to H100, H200, B200, and B300 variants.",
+                tier=EngineSupportTier.PREVIEW,
+                reason=(
+                    "vLLM can be used on non-production NVIDIA GPUs such as A10G for smoke and plumbing validation, "
+                    "but those runs are not production-comparable benchmark lanes."
+                ),
             )
         return EngineSupport(
             engine="vllm",

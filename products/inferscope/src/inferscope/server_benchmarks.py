@@ -21,7 +21,13 @@ from inferscope.benchmarks.probe_resolution import (
 )
 from inferscope.config import settings
 from inferscope.endpoint_auth import resolve_auth_payload
-from inferscope.production_target import build_benchmark_readiness_summary, build_production_contract
+from inferscope.production_target import (
+    build_benchmark_readiness_summary,
+    build_lane_summary,
+    build_production_contract,
+    supported_configuration_hint,
+    validate_production_lane_artifact,
+)
 
 
 def _resolve_artifact_path_for_mcp(path_or_name: str) -> Path:
@@ -41,6 +47,11 @@ def _production_error(errors: list[str]) -> dict[str, Any]:
         "error": "; ".join(errors),
         "summary": "❌ Unsupported production target",
         "production_target": build_production_contract(),
+        "next_steps": [
+            "Switch to a production-validated Kimi lane or a benchmark-supported public-model lane "
+            "on H100, H200, B200, or B300.",
+            supported_configuration_hint(),
+        ],
         "confidence": 1.0,
         "evidence": "production_target_validation",
     }
@@ -52,6 +63,11 @@ def _support_error(message: str, support: Any | None = None) -> dict[str, Any]:
         "support": support.model_dump(mode="json") if support is not None else None,
         "summary": "❌ Unsupported benchmark configuration",
         "production_target": build_production_contract(),
+        "next_steps": [
+            "Adjust the requested GPU, engine, topology, or experiment to match one of the "
+            "shipped production or benchmark contracts.",
+            supported_configuration_hint(),
+        ],
         "confidence": 1.0,
         "evidence": "benchmark_support_assessment",
     }
@@ -62,6 +78,10 @@ def _resolution_error(message: str) -> dict[str, Any]:
         "error": message,
         "summary": "❌ Failed to resolve benchmark plan",
         "production_target": build_production_contract(),
+        "next_steps": [
+            "Verify the workload, experiment, and metrics target inputs first.",
+            supported_configuration_hint(),
+        ],
         "confidence": 1.0,
         "evidence": "benchmark_plan_resolution",
     }
@@ -88,6 +108,8 @@ def _resolve_benchmark_plan(
     synthetic_output_tokens: int = 0,
     synthetic_seed: int = 42,
     context_file: str = "",
+    model_artifact_path: str = "",
+    artifact_manifest: str = "",
 ):
     try:
         resolved = resolve_probe_plan(
@@ -110,6 +132,8 @@ def _resolve_benchmark_plan(
             synthetic_output_tokens=(synthetic_output_tokens or None),
             synthetic_seed=synthetic_seed,
             context_file=context_file,
+            model_artifact_path=model_artifact_path,
+            artifact_manifest=artifact_manifest,
             allow_context_file=False,
         )
     except ProductionTargetValidationError as exc:
@@ -133,8 +157,8 @@ def register_benchmark_tools(mcp: FastMCP) -> None:
         contract = build_production_contract()
         return {
             "summary": (
-                "InferScope MCP is scoped to Kimi-K2.5 long-context coding on Hopper/Blackwell, "
-                "with Dynamo as the production lane and vLLM as the comparison lane."
+                "InferScope MCP exposes three surfaces: the production-validated Kimi lane, "
+                "benchmark-supported public-model comparison lanes, and a preview-only low-cost A10G smoke path."
             ),
             "production_target": contract,
             "confidence": 1.0,
@@ -162,9 +186,11 @@ def register_benchmark_tools(mcp: FastMCP) -> None:
         synthetic_output_tokens: int = 0,
         synthetic_seed: int = 42,
         context_file: str = "",
+        model_artifact_path: str = "",
+        artifact_manifest: str = "",
     ) -> dict[str, Any]:
         """Resolve the supported InferScope probe into a concrete run plan."""
-        error, workload_reference, _, run_plan, support = _resolve_benchmark_plan(
+        error, workload_reference, workload_pack, run_plan, support = _resolve_benchmark_plan(
             workload,
             endpoint,
             experiment=experiment,
@@ -184,13 +210,24 @@ def register_benchmark_tools(mcp: FastMCP) -> None:
             synthetic_output_tokens=synthetic_output_tokens,
             synthetic_seed=synthetic_seed,
             context_file=context_file,
+            model_artifact_path=model_artifact_path,
+            artifact_manifest=artifact_manifest,
         )
         if error is not None:
             return cast(dict[str, Any], error)
         return {
             "summary": f"Resolved probe plan for {workload_reference}",
+            "lane": build_lane_summary(
+                model_name=run_plan.model,
+                workload_pack=workload_pack.name,
+            ),
             "run_plan": cast(dict[str, Any], run_plan.model_dump(mode="json")),
             "support": cast(dict[str, Any], support.model_dump(mode="json")) if support is not None else None,
+            "preflight_validation": (
+                cast(dict[str, Any], run_plan.preflight_validation.model_dump(mode="json"))
+                if run_plan.preflight_validation is not None
+                else None
+            ),
             "production_target": build_production_contract(),
             "confidence": 0.95,
             "evidence": "benchmark_plan_resolution",
@@ -219,6 +256,8 @@ def register_benchmark_tools(mcp: FastMCP) -> None:
         synthetic_output_tokens: int = 0,
         synthetic_seed: int = 42,
         context_file: str = "",
+        model_artifact_path: str = "",
+        artifact_manifest: str = "",
         provider: str = "",
         metrics_provider: str = "",
         request_auth: dict | None = None,
@@ -245,6 +284,8 @@ def register_benchmark_tools(mcp: FastMCP) -> None:
             synthetic_output_tokens=synthetic_output_tokens,
             synthetic_seed=synthetic_seed,
             context_file=context_file,
+            model_artifact_path=model_artifact_path,
+            artifact_manifest=artifact_manifest,
         )
         if error is not None:
             return cast(dict[str, Any], error)
@@ -291,8 +332,17 @@ def register_benchmark_tools(mcp: FastMCP) -> None:
             ),
             "artifact_path": artifact_path,
             "benchmark_id": artifact.benchmark_id,
+            "lane": build_lane_summary(
+                model_name=run_plan.model,
+                workload_pack=workload_pack.name,
+            ),
             "run_plan": cast(dict[str, Any], run_plan.model_dump(mode="json")),
             "support": cast(dict[str, Any], support.model_dump(mode="json")) if support is not None else None,
+            "preflight_validation": (
+                cast(dict[str, Any], run_plan.preflight_validation.model_dump(mode="json"))
+                if run_plan.preflight_validation is not None
+                else None
+            ),
             "observed_runtime": (
                 cast(dict[str, Any], artifact.run_plan.get("observed_runtime", {})) if artifact.run_plan else {}
             ),
@@ -328,3 +378,20 @@ def register_benchmark_tools(mcp: FastMCP) -> None:
             "confidence": 1.0,
             "evidence": "saved_benchmark_artifact",
         }
+
+    @mcp.tool()
+    async def tool_validate_production_lane(
+        candidate_artifact: str,
+        baseline_artifact: str = "",
+    ) -> dict[str, Any]:
+        """Validate whether saved artifacts belong to the canonical production lane."""
+        candidate = load_benchmark_artifact(_resolve_artifact_path_for_mcp(candidate_artifact))
+        baseline = (
+            load_benchmark_artifact(_resolve_artifact_path_for_mcp(baseline_artifact))
+            if baseline_artifact
+            else None
+        )
+        payload = validate_production_lane_artifact(candidate, baseline=baseline)
+        payload["confidence"] = 1.0
+        payload["evidence"] = "production_lane_validation"
+        return payload

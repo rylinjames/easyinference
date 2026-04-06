@@ -1,0 +1,141 @@
+{
+  "profile_version": "1",
+  "source_kind": "prometheus_runtime",
+  "endpoint": "http://localhost:8000",
+  "metrics_snapshot": {
+    "captured_at": "2026-04-04T14:20:00Z",
+    "endpoint": "http://localhost:9090",
+    "engine": "dynamo",
+    "target_name": "frontend",
+    "target_role": "frontend",
+    "expected_engine": "dynamo",
+    "scrape_time_ms": 37.2,
+    "error": "",
+    "raw_metrics": {
+      "request_throughput_rps": 2.8,
+      "prefix_cache_hit_rate": 0.47,
+      "gpu_memory_utilization": 0.91
+    },
+    "normalized_metrics": {
+      "request_throughput_rps": 2.8,
+      "output_throughput_tps": 164.0,
+      "gpu_memory_utilization": 0.91,
+      "queue_depth": 3.0,
+      "cache_effectiveness": {
+        "prefix_cache_hit_rate": 0.47,
+        "prefix_cache_hits": 14
+      }
+    },
+    "samples": []
+  },
+  "metrics": {
+    "request_throughput_rps": 2.8,
+    "output_throughput_tps": 164.0,
+    "gpu_memory_utilization": 0.91,
+    "queue_depth": 3.0
+  },
+  "health": {
+    "status": "warning",
+    "endpoint_reachable": true,
+    "metrics_reachable": true
+  },
+  "memory_pressure": {
+    "status": "warning",
+    "gpu_memory_utilization": 0.91,
+    "summary": "GPU memory utilization is high enough to watch for KV pressure."
+  },
+  "cache_effectiveness": {
+    "prefix_cache_hit_rate": 0.47,
+    "prefix_cache_hits": 14,
+    "summary": "Prefix cache is helping, but there is still room to improve reuse."
+  },
+  "reliability": {
+    "failed_sessions": 0,
+    "failure_types": {},
+    "summary": "No failed sessions observed in the sampled window."
+  },
+  "workload": {
+    "workload_shape": "long_context_coding",
+    "concurrency_hint": 2,
+    "summary": "Observed request mix looks closest to long-context coding traffic."
+  },
+  "identity": {
+    "engine": "dynamo",
+    "engine_source": "metrics",
+    "adapter_name": "dynamo",
+    "served_models": [
+      "Kimi-K2.5"
+    ],
+    "config_snapshot": {
+      "tp": 8,
+      "quantization": "fp8",
+      "kv_cache_dtype": "fp8_e4m3"
+    },
+    "config_error": "",
+    "notes": [
+      "Runtime identity inferred from metrics labels and endpoint hints."
+    ]
+  },
+  "audit": {
+    "status": "warning",
+    "checks_total": 31,
+    "checks_failed": 2,
+    "top_findings": [
+      "GPU memory utilization is near the configured headroom.",
+      "Prefix cache hit rate is below the best-practice target for this workload."
+    ]
+  },
+  "bottlenecks": [
+    {
+      "kind": "cache_bound",
+      "severity": "warning",
+      "confidence": 0.82,
+      "summary": "KV cache pressure is the dominant bottleneck in the sampled runtime window.",
+      "trigger_check_ids": [
+        "kv_headroom",
+        "prefix_cache_utilization"
+      ],
+      "evidence": [
+        "gpu_memory_utilization=0.91",
+        "prefix_cache_hit_rate=0.47"
+      ],
+      "supporting_metrics": {
+        "gpu_memory_utilization": 0.91,
+        "prefix_cache_hit_rate": 0.47
+      }
+    }
+  ],
+  "tuning_preview": {
+    "mode": "preview",
+    "adjustments": [
+      {
+        "parameter": "gpu_memory_utilization",
+        "current_value": 0.9,
+        "recommended_value": 0.92,
+        "reason": "Raise KV headroom slightly to reduce allocator churn under long-context load.",
+        "confidence": 0.74,
+        "trigger": "kv_cache_pressure"
+      }
+    ],
+    "updated_scheduler": {
+      "batched_token_budget": 8192
+    },
+    "updated_cache": {
+      "gpu_memory_utilization": 0.92
+    },
+    "summary": "Small cache tuning changes are likely to improve reuse before topology changes are needed.",
+    "error": ""
+  },
+  "profiling_intent": {
+    "primary_goal": "understand_kv_behavior",
+    "suggested_next_step": "Resolve a benchmark plan only after the runtime profile is stable."
+  },
+  "reasoning": [
+    "runtime_profile: Metrics were scraped successfully and normalized into runtime evidence.",
+    "kv_cache: Memory pressure is elevated and cache reuse is only moderate.",
+    "tuning_preview: A small cache headroom adjustment is lower risk than immediate topology changes."
+  ],
+  "summary": "Runtime profile shows elevated KV pressure with moderate prefix cache reuse on a Dynamo Kimi deployment.",
+  "confidence": 0.84,
+  "evidence": "runtime_profile"
+}

@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Literal, Mapping
+from typing import TYPE_CHECKING, Any, Literal
 
+from inferscope.benchmarks.models import BenchmarkLaneReference
 from inferscope.hardware.gpu_profiles import GPUProfile, get_gpu_profile
 from inferscope.models.registry import ModelVariant, get_model_variant
 
@@ -21,6 +22,7 @@ SUPPORTED_WORKLOAD_PACK = "kimi-k2-long-context-coding"
 SUPPORTED_TOPOLOGY_MODES = ("single_endpoint", "prefill_decode_split")
 SUPPORTED_CACHE_STRATEGIES = ("lmcache",)
 SUPPORTED_GPU_CANONICAL = ("h100", "h200", "b200", "b300")
+BENCHMARK_PREVIEW_GPU_CANONICAL = ("a10g",)
 SUPPORTED_GPU_NAMES = {
     "H100 SXM",
     "H100 NVL",
@@ -30,6 +32,9 @@ SUPPORTED_GPU_NAMES = {
     "B200",
     "B300",
 }
+BENCHMARK_PREVIEW_GPU_NAMES = {"A10G"}
+SUPPORTED_BENCHMARK_GPU_CANONICAL = SUPPORTED_GPU_CANONICAL + BENCHMARK_PREVIEW_GPU_CANONICAL
+SUPPORTED_BENCHMARK_GPU_NAMES = SUPPORTED_GPU_NAMES | BENCHMARK_PREVIEW_GPU_NAMES
 NON_GOALS = [
     "Generic benchmark matrix or workload catalog discovery.",
     "Benchmark strategy planners and stack-plan materialization as public product surfaces.",
@@ -77,11 +82,18 @@ _PLANNING_ONLY_PHASES: tuple[str, ...] = ("kv_math",)
 
 # --- Tier-specific constants ---
 PRODUCTION_VALIDATED_MODELS = ("Kimi-K2.5",)
-BENCHMARK_SUPPORTED_MODELS = ("Qwen3-Coder-480B-A35B-Instruct", "Qwen3-Coder-30B-A3B-Instruct", "Qwen3-Coder-Next")
+BENCHMARK_SUPPORTED_MODELS = (
+    "Qwen3.5-32B",
+    "Qwen2.5-7B-Instruct",
+    "Qwen3-Coder-480B-A35B-Instruct",
+    "Qwen3-Coder-30B-A3B-Instruct",
+    "Qwen3-Coder-Next",
+)
 PLANNING_PREVIEW_MODELS: tuple[str, ...] = ()
 
 PRODUCTION_WORKLOAD_PACKS = ("kimi-k2-long-context-coding",)
-BENCHMARK_WORKLOAD_PACKS = ("qwen3-coder-kv-stress",)
+BENCHMARK_WORKLOAD_PACKS = ("coding-long-context", "qwen3-coder-kv-stress")
+SMOKE_WORKLOAD_PACKS = ("coding-smoke",)
 
 PRODUCTION_EXPERIMENTS = (
     "dynamo-aggregated-lmcache-kimi-k2",
@@ -89,10 +101,12 @@ PRODUCTION_EXPERIMENTS = (
     "dynamo-disagg-lmcache-kimi-k2",
 )
 BENCHMARK_EXPERIMENTS = (
+    "vllm-single-endpoint-baseline",
     "dynamo-aggregated-lmcache-qwen3-coder-480b",
     "dynamo-disagg-lmcache-qwen3-coder-480b",
     "vllm-disagg-prefill-nixl-qwen3-coder-30b",
 )
+SMOKE_EXPERIMENTS = ("vllm-single-endpoint-smoke",)
 
 # --- Model support registry ---
 _MODEL_CONTRACTS: dict[str, ModelSupportContract] = {
@@ -104,6 +118,28 @@ _MODEL_CONTRACTS: dict[str, ModelSupportContract] = {
         allowed_phases=_ALL_LIVE_PHASES,
         recommendation_scope="full_operator",
         kv_estimation_mode="exact",
+    ),
+    "Qwen3.5-32B": ModelSupportContract(
+        model_name="Qwen3.5-32B",
+        tier="benchmark_supported",
+        allowed_workloads=("coding-long-context",),
+        allowed_experiments=("vllm-single-endpoint-baseline",),
+        allowed_phases=_ALL_LIVE_PHASES,
+        recommendation_scope="benchmark_only",
+        kv_estimation_mode="exact",
+    ),
+    "Qwen2.5-7B-Instruct": ModelSupportContract(
+        model_name="Qwen2.5-7B-Instruct",
+        tier="benchmark_supported",
+        allowed_workloads=SMOKE_WORKLOAD_PACKS,
+        allowed_experiments=SMOKE_EXPERIMENTS,
+        allowed_phases=_ALL_LIVE_PHASES,
+        recommendation_scope="benchmark_only",
+        kv_estimation_mode="exact",
+        warnings=(
+            "Smoke lane intended for low-cost endpoint validation and CLI/MCP plumbing, "
+            "not production-comparable throughput claims.",
+        ),
     ),
     "Qwen3-Coder-480B-A35B-Instruct": ModelSupportContract(
         model_name="Qwen3-Coder-480B-A35B-Instruct",
@@ -139,8 +175,8 @@ _MODEL_CONTRACTS: dict[str, ModelSupportContract] = {
 }
 
 SUPPORTED_MODELS = PRODUCTION_VALIDATED_MODELS + BENCHMARK_SUPPORTED_MODELS + PLANNING_PREVIEW_MODELS
-SUPPORTED_WORKLOAD_PACKS = PRODUCTION_WORKLOAD_PACKS + BENCHMARK_WORKLOAD_PACKS
-SUPPORTED_EXPERIMENTS = PRODUCTION_EXPERIMENTS + BENCHMARK_EXPERIMENTS
+SUPPORTED_WORKLOAD_PACKS = PRODUCTION_WORKLOAD_PACKS + BENCHMARK_WORKLOAD_PACKS + SMOKE_WORKLOAD_PACKS
+SUPPORTED_EXPERIMENTS = PRODUCTION_EXPERIMENTS + BENCHMARK_EXPERIMENTS + SMOKE_EXPERIMENTS
 DEFAULT_EXPERIMENT = SUPPORTED_EXPERIMENTS[0]
 
 RELIABILITY_MIN_SUCCESS_RATE = 0.99
@@ -177,6 +213,7 @@ TRACE_ENV_VARS = [
     "OTEL_SERVICE_NAME",
 ]
 REQUEST_HEADERS = ["x-request-id", "x-session-id"]
+SUPPORTED_CONFIG_DOC = "products/inferscope/docs/QUICKSTART.md"
 
 
 def _normalize(value: str) -> str:
@@ -196,6 +233,11 @@ def supported_model_names(tier: str | None = None) -> list[str]:
 
 def supported_gpu_aliases() -> list[str]:
     return list(SUPPORTED_GPU_CANONICAL)
+
+
+def supported_benchmark_gpu_aliases() -> list[str]:
+    """Return all GPUs allowed for benchmark or smoke validation surfaces."""
+    return list(SUPPORTED_BENCHMARK_GPU_CANONICAL)
 
 
 def supported_benchmark_engines() -> list[str]:
@@ -251,6 +293,16 @@ def resolve_supported_gpu(gpu_name: str) -> GPUProfile | None:
         return None
     gpu = get_gpu_profile(gpu_name)
     if gpu is None or gpu.name not in SUPPORTED_GPU_NAMES:
+        return None
+    return gpu
+
+
+def resolve_supported_benchmark_gpu(gpu_name: str) -> GPUProfile | None:
+    """Resolve a GPU allowed for benchmark or smoke validation surfaces."""
+    if not gpu_name.strip():
+        return None
+    gpu = get_gpu_profile(gpu_name)
+    if gpu is None or gpu.name not in SUPPORTED_BENCHMARK_GPU_NAMES:
         return None
     return gpu
 
@@ -319,9 +371,17 @@ def is_model_in_tier(model_name: str, tier: str) -> bool:
 
 def target_profile_summary() -> str:
     return (
-        "InferScope production scope: Kimi-K2.5 with Dynamo + LMCache for long-context coding on H100/H200/B200/B300; "
-        "vLLM exists only as the comparison benchmark lane."
+        "InferScope has three distinct surfaces: "
+        "a production-validated Kimi-K2.5 Dynamo + LMCache lane on H100/H200/B200/B300, "
+        "benchmark-supported public-model comparison lanes for Qwen coder models, "
+        "and a low-cost preview smoke lane for Qwen2.5-7B on A10G or serverless single-endpoint validation. "
+        "Only the first surface is production-validated."
     )
+
+
+def supported_configuration_hint() -> str:
+    """Return the canonical doc path for the currently supported production lane."""
+    return f"See {SUPPORTED_CONFIG_DOC} for the current supported InferScope lane."
 
 
 def _minimum_tp_for_lane(model: ModelVariant) -> int:
@@ -369,7 +429,7 @@ def required_gpus_for_topology(
 ) -> int:
     """Return the minimum practical GPU count for the target topology."""
     model = resolve_supported_model(model_name) or resolve_supported_model(SUPPORTED_MODEL)
-    gpu = resolve_supported_gpu(gpu_name) if gpu_name else None
+    gpu = get_gpu_profile(gpu_name) if gpu_name else None
     tp_min = _minimum_tp_for_gpu(model, gpu) if model is not None else 1
     normalized_topology = topology_mode.strip().lower() or "single_endpoint"
     if normalized_topology == "prefill_decode_split":
@@ -388,34 +448,71 @@ def validate_production_target(
 ) -> list[str]:
     """Return user-facing validation errors for unsupported MCP benchmark targets."""
     errors: list[str] = []
+    contract = resolve_model_support_contract(model_name) if model_name else None
 
     if model_name and resolve_supported_model(model_name) is None:
         errors.append(
-            f"Model '{model_name}' is not supported. Supported models: "
-            f"{', '.join(SUPPORTED_MODELS)}."
+            "Model "
+            f"'{model_name}' is not supported for the current InferScope lane. "
+            f"Supported models today: {', '.join(SUPPORTED_MODELS)}. "
+            "Workaround: use the Kimi production lane or one of the benchmark-supported public model lanes. "
+            f"{supported_configuration_hint()}"
         )
 
-    if gpu_name and resolve_supported_gpu(gpu_name) is None:
-        errors.append(
-            "InferScope MCP currently supports Hopper/Blackwell production GPUs only: H100, H200, B200, B300."
-        )
+    if gpu_name:
+        gpu_profile = get_gpu_profile(gpu_name)
+        if gpu_profile is None:
+            errors.append(
+                f"GPU '{gpu_name}' is unknown to InferScope. "
+                "Workaround: use a known GPU alias such as h100, h200, b200, b300, or a10g."
+            )
+        else:
+            allow_benchmark_preview = contract is None or contract.tier != "production_validated"
+            gpu_allowed = (
+                resolve_supported_benchmark_gpu(gpu_name)
+                if allow_benchmark_preview
+                else resolve_supported_gpu(gpu_name)
+            )
+            if gpu_allowed is None:
+                allowed_aliases = (
+                    supported_benchmark_gpu_aliases() if allow_benchmark_preview else supported_gpu_aliases()
+                )
+                errors.append(
+                    "GPU "
+                    f"'{gpu_name}' is not supported for the current InferScope lane. "
+                    f"Allowed GPU aliases for this lane: {', '.join(allowed_aliases)}. "
+                    "Workaround: use a production Hopper/Blackwell target for validated runs, "
+                    "or the low-cost A10G smoke lane for preview validation. "
+                    f"{supported_configuration_hint()}"
+                )
 
     if workload:
         normalized = normalize_target_workload_class(workload)
         if normalized not in set(SUPPORTED_WORKLOAD_MODES):
             errors.append(
-                "InferScope MCP supports coding and chat workflows only; got "
-                f"'{workload}'."
+                "Workload "
+                f"'{workload}' is outside the current InferScope lane. "
+                "InferScope currently supports coding and chat workflows only. "
+                f"Workaround: use the {SUPPORTED_WORKLOAD_PACK} workload pack for the shipped benchmark path. "
+                f"{supported_configuration_hint()}"
             )
 
     if engine:
         normalized_engine = _normalize(engine)
         if normalized_engine not in {"", "auto", *SUPPORTED_BENCHMARK_ENGINES}:
-            errors.append("InferScope MCP currently supports vLLM comparison and NVIDIA Dynamo only.")
+            errors.append(
+                "Engine "
+                f"'{engine}' is not supported for the current InferScope lane. "
+                "InferScope currently supports NVIDIA Dynamo as the production lane and vLLM as the comparison lane. "
+                "Workaround: use Dynamo for production-target benchmarking or vLLM for comparison runs. "
+                f"{supported_configuration_hint()}"
+            )
 
     if topology_mode and not supports_topology(topology_mode):
         errors.append(
-            f"InferScope MCP supports only {', '.join(SUPPORTED_TOPOLOGY_MODES)} topologies; got '{topology_mode}'."
+            f"Topology '{topology_mode}' is not supported. "
+            f"InferScope currently supports only {', '.join(SUPPORTED_TOPOLOGY_MODES)} topologies. "
+            f"Workaround: use single_endpoint or prefill_decode_split. {supported_configuration_hint()}"
         )
 
     if num_gpus:
@@ -427,8 +524,10 @@ def validate_production_target(
         if required_gpus and num_gpus < required_gpus:
             topology_label = topology_mode or "single_endpoint"
             errors.append(
-                f"InferScope MCP requires at least {required_gpus} GPU(s) for "
-                f"{topology_label} serving on this target; got {num_gpus}."
+                f"InferScope requires at least {required_gpus} GPU(s) for "
+                f"{topology_label} serving on this target; got {num_gpus}. "
+                "Workaround: request more GPUs or switch to the aggregated single-endpoint lane if appropriate. "
+                f"{supported_configuration_hint()}"
             )
 
     return errors
@@ -441,6 +540,40 @@ def build_production_contract() -> dict[str, Any]:
         "scope_summary": target_profile_summary(),
         "model": SUPPORTED_MODEL,
         "models": list(SUPPORTED_MODELS),
+        "support_tiers": {
+            "production_validated_models": list(PRODUCTION_VALIDATED_MODELS),
+            "benchmark_supported_models": list(BENCHMARK_SUPPORTED_MODELS),
+            "planning_preview_models": list(PLANNING_PREVIEW_MODELS),
+        },
+        "lane_classes": {
+            "production_validated": {
+                "summary": (
+                    "Production-validated operator lane for Kimi-K2.5 on Dynamo with LMCache. "
+                    "Use this for truthful deployment comparisons and production-readiness judgments."
+                ),
+                "workload_packs": list(PRODUCTION_WORKLOAD_PACKS),
+                "experiments": list(PRODUCTION_EXPERIMENTS),
+                "gpu_aliases": list(SUPPORTED_GPU_CANONICAL),
+            },
+            "benchmark_supported": {
+                "summary": (
+                    "Public-model comparison surfaces that are benchmark-supported but not equivalent "
+                    "to the Kimi production lane."
+                ),
+                "workload_packs": list(BENCHMARK_WORKLOAD_PACKS),
+                "experiments": list(BENCHMARK_EXPERIMENTS),
+                "gpu_aliases": list(SUPPORTED_GPU_CANONICAL),
+            },
+            "preview_smoke": {
+                "summary": (
+                    "Low-cost validation path for endpoint health, observability, and CLI/MCP plumbing. "
+                    "Use this for smoke testing, not production-comparable performance claims."
+                ),
+                "workload_packs": list(SMOKE_WORKLOAD_PACKS),
+                "experiments": list(SMOKE_EXPERIMENTS),
+                "gpu_aliases": list(BENCHMARK_PREVIEW_GPU_CANONICAL),
+            },
+        },
         "engine": SUPPORTED_ENGINE,
         "benchmark_engines": list(SUPPORTED_BENCHMARK_ENGINES),
         "workload_mode": SUPPORTED_WORKLOAD_MODE,
@@ -450,6 +583,7 @@ def build_production_contract() -> dict[str, Any]:
         "experiments": list(SUPPORTED_EXPERIMENTS),
         "default_experiment": DEFAULT_EXPERIMENT,
         "supported_gpu_aliases": list(SUPPORTED_GPU_CANONICAL),
+        "benchmark_preview_gpu_aliases": list(BENCHMARK_PREVIEW_GPU_CANONICAL),
         "non_goals": list(NON_GOALS),
         "observability": {
             "frontend_metrics": list(FRONTEND_METRICS),
@@ -473,6 +607,29 @@ def build_production_contract() -> dict[str, Any]:
             "warning_kv_usage": RELIABILITY_WARNING_KV_USAGE,
         },
         "topologies": [
+            {
+                "name": "budget_smoke_single_endpoint",
+                "experiment": "vllm-single-endpoint-smoke",
+                "min_gpus": required_gpus_for_topology(
+                    model_name="Qwen2.5-7B-Instruct",
+                    gpu_name="A10G",
+                    topology_mode="single_endpoint",
+                ),
+                "summary": "Low-cost vLLM smoke lane for A10G and serverless endpoint validation.",
+            },
+            {
+                "name": "benchmark_single_endpoint",
+                "experiment": "vllm-single-endpoint-baseline",
+                "min_gpus": required_gpus_for_topology(
+                    model_name="Qwen3.5-32B",
+                    gpu_name="H100 SXM",
+                    topology_mode="single_endpoint",
+                ),
+                "summary": (
+                    "Single vLLM endpoint public-model benchmark lane "
+                    "for one-H100 replay validation and comparison work."
+                ),
+            },
             {
                 "name": "aggregated",
                 "experiment": SUPPORTED_EXPERIMENTS[0],
@@ -507,6 +664,64 @@ def build_production_contract() -> dict[str, Any]:
     }
 
 
+def build_lane_summary(*, model_name: str, workload_pack: str) -> dict[str, Any]:
+    """Return a compact product-facing description of the selected lane."""
+    contract = resolve_model_support_contract(model_name)
+    if workload_pack in SMOKE_WORKLOAD_PACKS:
+        lane_class = "preview_smoke"
+        claim_scope = "toolchain_validation_only"
+        summary = (
+            "Preview smoke lane for endpoint health, observability, and CLI/MCP validation. "
+            "Do not treat results as production-comparable benchmark claims."
+        )
+    elif contract is not None and contract.tier == "production_validated":
+        lane_class = "production_validated"
+        claim_scope = "production_comparable"
+        summary = (
+            "Production-validated InferScope lane. Results can be used for operator-facing "
+            "comparisons within the current Kimi/Dynamo product scope."
+        )
+    else:
+        lane_class = "benchmark_supported"
+        claim_scope = "benchmark_comparison_only"
+        summary = (
+            "Benchmark-supported public-model lane. Useful for comparison and replay validation, "
+            "but not equivalent to the production-validated Kimi lane."
+        )
+    warnings = list(contract.warnings) if contract is not None else []
+    return {
+        "class": lane_class,
+        "claim_scope": claim_scope,
+        "summary": summary,
+        "warnings": warnings,
+    }
+
+
+def build_lane_reference(
+    *,
+    model_name: str,
+    workload_pack: str,
+    experiment_name: str | None = None,
+) -> BenchmarkLaneReference:
+    """Build typed benchmark-lane provenance metadata."""
+    contract = resolve_model_support_contract(model_name)
+    lane_summary = build_lane_summary(model_name=model_name, workload_pack=workload_pack)
+    return BenchmarkLaneReference(
+        class_name=lane_summary["class"],
+        claim_scope=lane_summary["claim_scope"],
+        model_support_tier=(contract.tier if contract is not None else "unmanaged"),
+        production_target_name=(
+            PRODUCTION_TARGET_NAME
+            if contract is not None and contract.tier == "production_validated"
+            else None
+        ),
+        workload_pack=workload_pack,
+        experiment=experiment_name,
+        summary=lane_summary["summary"],
+        warnings=list(lane_summary["warnings"]),
+    )
+
+
 def build_benchmark_readiness_summary(artifact: BenchmarkArtifact) -> dict[str, Any]:
     """Summarize benchmark reliability and observability in production terms."""
     total_requests = artifact.summary.total_requests or 0
@@ -519,7 +734,8 @@ def build_benchmark_readiness_summary(artifact: BenchmarkArtifact) -> dict[str, 
     issues: list[str] = []
     if success_rate < RELIABILITY_MIN_SUCCESS_RATE:
         issues.append(
-            f"Request success rate is {success_rate:.1%}, below the {RELIABILITY_MIN_SUCCESS_RATE:.0%} production target."
+            "Request success rate is "
+            f"{success_rate:.1%}, below the {RELIABILITY_MIN_SUCCESS_RATE:.0%} production target."
         )
     if RELIABILITY_REQUIRE_METRICS_CAPTURE_COMPLETE and not artifact.summary.metrics_capture_complete:
         issues.append("Metrics capture was incomplete across declared targets.")
@@ -549,4 +765,109 @@ def build_benchmark_readiness_summary(artifact: BenchmarkArtifact) -> dict[str, 
             f"failed_sessions={failed_sessions}, "
             f"observability_gaps={observability_gaps}"
         ),
+    }
+
+
+def _artifact_preflight_validation(artifact: BenchmarkArtifact) -> dict[str, Any] | None:
+    if not artifact.run_plan or not isinstance(artifact.run_plan, dict):
+        return None
+    preflight = artifact.run_plan.get("preflight_validation")
+    return preflight if isinstance(preflight, dict) else None
+
+
+def validate_production_lane_artifact(
+    candidate: BenchmarkArtifact,
+    *,
+    baseline: BenchmarkArtifact | None = None,
+) -> dict[str, Any]:
+    """Validate whether one artifact belongs to the canonical production lane."""
+    from inferscope.benchmarks.catalog import compare_benchmark_artifacts
+
+    readiness = build_benchmark_readiness_summary(candidate)
+    candidate_lane = candidate.provenance.lane if candidate.provenance is not None else None
+    candidate_preflight = _artifact_preflight_validation(candidate)
+
+    issues: list[str] = []
+    warnings: list[str] = []
+
+    if candidate.provenance is None:
+        issues.append("Artifact is missing provenance metadata.")
+    if candidate_lane is None:
+        issues.append("Artifact is missing lane provenance.")
+    else:
+        if candidate_lane.class_name != "production_validated":
+            issues.append(
+                f"Artifact lane class is '{candidate_lane.class_name}', not 'production_validated'."
+            )
+        if candidate_lane.claim_scope != "production_comparable":
+            issues.append(
+                f"Artifact claim scope is '{candidate_lane.claim_scope}', not 'production_comparable'."
+            )
+        if candidate_lane.production_target_name != PRODUCTION_TARGET_NAME:
+            issues.append(
+                "Artifact does not target the canonical production contract "
+                f"'{PRODUCTION_TARGET_NAME}'."
+            )
+        warnings.extend(candidate_lane.warnings)
+
+    if not readiness["ready"]:
+        issues.append("Artifact failed production readiness checks.")
+
+    if candidate_preflight is not None and not candidate_preflight.get("valid", False):
+        issues.append("Artifact run plan records a failed preflight_validation.")
+
+    comparison: dict[str, Any] | None = None
+    baseline_lane: BenchmarkLaneReference | None = None
+    if baseline is not None:
+        baseline_lane = baseline.provenance.lane if baseline.provenance is not None else None
+        comparison = compare_benchmark_artifacts(baseline, candidate)
+        if baseline.provenance is None:
+            issues.append("Baseline artifact is missing provenance metadata.")
+        if baseline_lane is None:
+            issues.append("Baseline artifact is missing lane provenance.")
+        else:
+            if baseline_lane.class_name != "production_validated":
+                issues.append(
+                    f"Baseline lane class is '{baseline_lane.class_name}', not 'production_validated'."
+                )
+            if baseline_lane.production_target_name != PRODUCTION_TARGET_NAME:
+                issues.append(
+                    "Baseline artifact does not target the canonical production contract "
+                    f"'{PRODUCTION_TARGET_NAME}'."
+                )
+        if not comparison["compatibility"]["comparable"]:
+            issues.append("Baseline and candidate artifacts are not directly comparable.")
+
+    summary = (
+        "Artifact matches the canonical production lane."
+        if not issues
+        else "Artifact does not satisfy the canonical production-lane contract."
+    )
+
+    return {
+        "summary": summary,
+        "valid": not issues,
+        "issues": issues,
+        "warnings": warnings,
+        "candidate": {
+            "model": candidate.model,
+            "pack_name": candidate.pack_name,
+            "benchmark_id": candidate.benchmark_id,
+            "lane": candidate_lane.model_dump(mode="json") if candidate_lane is not None else None,
+            "preflight_validation": candidate_preflight,
+        },
+        "baseline": (
+            {
+                "model": baseline.model,
+                "pack_name": baseline.pack_name,
+                "benchmark_id": baseline.benchmark_id,
+                "lane": baseline_lane.model_dump(mode="json") if baseline_lane is not None else None,
+                "preflight_validation": _artifact_preflight_validation(baseline),
+            }
+            if baseline is not None
+            else None
+        ),
+        "production_readiness": readiness,
+        "comparison": comparison,
+        "production_target": build_production_contract(),
     }

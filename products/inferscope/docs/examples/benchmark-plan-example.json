@@ -1,0 +1,49 @@
+{
+  "summary": "Resolved probe plan for kimi-k2-long-context-coding",
+  "run_plan": {
+    "workload_name": "kimi-k2-long-context-coding",
+    "source_experiment": "dynamo-aggregated-lmcache-kimi-k2",
+    "model": "Kimi-K2.5",
+    "gpu": {
+      "name": "B200",
+      "gpu_isa": "sm_100",
+      "count": 8
+    },
+    "topology": {
+      "mode": "single_endpoint"
+    },
+    "cache": {
+      "strategy": "lmcache"
+    },
+    "metrics_targets": [
+      {
+        "name": "frontend",
+        "role": "frontend",
+        "url": "http://localhost:9100"
+      },
+      {
+        "name": "worker",
+        "role": "worker",
+        "url": "http://localhost:9200"
+      }
+    ],
+    "concurrency": 2
+  },
+  "support": {
+    "supported": true,
+    "strict": true,
+    "gpu_isa": "sm_100",
+    "reasons": []
+  },
+  "production_target": {
+    "model": "Kimi-K2.5",
+    "production_engine": "dynamo",
+    "comparison_engine": "vllm",
+    "workload_pack": "kimi-k2-long-context-coding",
+    "topologies": [
+      "single_endpoint",
+      "prefill_decode_split"
+    ],
+    "cache_strategy": "lmcache"
+  }
+}

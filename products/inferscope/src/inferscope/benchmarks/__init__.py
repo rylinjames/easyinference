@@ -29,6 +29,11 @@ from inferscope.benchmarks.models import (
     WorkloadPack,
     WorkloadRequest,
 )
+from inferscope.benchmarks.preflight import (
+    BenchmarkArtifactManifest,
+    BenchmarkPreflightValidation,
+    validate_benchmark_preflight,
+)
 from inferscope.benchmarks.kv_cache_behavior import KVCacheBehaviorResult, run_kv_cache_behavior
 from inferscope.benchmarks.kv_capacity_probe import KVCapacityProbeResult, run_kv_capacity_probe
 from inferscope.benchmarks.kv_disagg_transfer import KVDisaggTransferResult, run_kv_disagg_transfer
@@ -48,6 +53,8 @@ __all__ = [
     "BenchmarkExecutionProfile",
     "BenchmarkExperimentSpec",
     "BenchmarkGoodputSLO",
+    "BenchmarkArtifactManifest",
+    "BenchmarkPreflightValidation",
     "BenchmarkRequestResult",
     "BenchmarkRunPlan",
     "BenchmarkSummary",
@@ -77,6 +84,7 @@ __all__ = [
     "parse_metrics_target_overrides",
     "resolve_experiment_reference",
     "resolve_workload_reference",
+    "validate_benchmark_preflight",
     "run_kv_cache_behavior",
     "run_kv_capacity_probe",
     "run_kv_disagg_transfer",

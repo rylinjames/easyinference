@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
+from urllib.parse import urlparse
 
 import click
 
@@ -17,6 +18,18 @@ from harness.paths import (
 from harness.replay_client import _normalize_base_url
 
 logger = logging.getLogger(__name__)
+
+_SERVERLESS_HOST_SUFFIXES = (
+    ".modal.run",
+    ".modal.com",
+    ".lightning.ai",
+)
+_LOCAL_ENDPOINT_HOSTS = {"localhost", "127.0.0.1", "::1"}
+_SERVERLESS_MIN_REQUEST_TIMEOUT_SECONDS = 180
+_REMOTE_MIN_REQUEST_TIMEOUT_SECONDS = 120
+_SERVERLESS_WARMUP_TIMEOUT_SECONDS = 180
+_MODEL_DETECT_TIMEOUT_SECONDS = 30
+_MODEL_DETECT_RETRIES = 2
 
 
 def _resolve_existing_click_path(
@@ -44,6 +57,116 @@ def _setup_logging(verbose: bool = False) -> None:
         level=level,
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
+
+
+def _endpoint_hostname(endpoint: str) -> str:
+    parsed = urlparse(_normalize_base_url(endpoint))
+    return (parsed.hostname or "").lower()
+
+
+def _is_local_endpoint(endpoint: str) -> bool:
+    host = _endpoint_hostname(endpoint)
+    return host in _LOCAL_ENDPOINT_HOSTS or host.endswith(".local")
+
+
+def _is_serverless_endpoint(endpoint: str) -> bool:
+    host = _endpoint_hostname(endpoint)
+    return any(host.endswith(suffix) for suffix in _SERVERLESS_HOST_SUFFIXES)
+
+
+def _default_request_timeout_seconds(endpoint: str, workload_type: str, duration: int) -> int:
+    timeout = min(max(duration * 2, 60), 300)
+    if workload_type in {"coding", "agent", "swebench", "coderforge"}:
+        timeout = max(timeout, 120)
+    if _is_serverless_endpoint(endpoint):
+        timeout = max(timeout, _SERVERLESS_MIN_REQUEST_TIMEOUT_SECONDS)
+    elif not _is_local_endpoint(endpoint):
+        timeout = max(timeout, _REMOTE_MIN_REQUEST_TIMEOUT_SECONDS)
+    return timeout
+
+
+def _default_total_timeout_seconds(
+    request_timeout_seconds: int,
+    duration: int,
+    num_requests: int,
+) -> int:
+    burst_budget = request_timeout_seconds * min(max(num_requests, 1), 4)
+    return max(duration * 3, burst_budget + 60)
+
+
+def _detect_model_id(
+    endpoint: str,
+    *,
+    auth_headers: dict[str, str] | None,
+    timeout_seconds: int,
+    retries: int,
+) -> tuple[str | None, str | None]:
+    import time
+
+    import requests as req
+
+    detect_headers: dict[str, str] = {}
+    if auth_headers:
+        detect_headers.update(auth_headers)
+
+    url = f"{_normalize_base_url(endpoint)}/v1/models"
+    attempts = max(1, retries + 1)
+    last_error: str | None = None
+
+    for attempt in range(1, attempts + 1):
+        try:
+            resp = req.get(url, headers=detect_headers, timeout=timeout_seconds)
+            resp.raise_for_status()
+            data = resp.json().get("data", [])
+            if data:
+                model_id = data[0].get("id")
+                if isinstance(model_id, str) and model_id.strip():
+                    return model_id, None
+            last_error = "no model entries returned"
+        except Exception as exc:  # noqa: BLE001
+            last_error = f"{type(exc).__name__}: {exc}"
+
+        if attempt < attempts:
+            time.sleep(min(2 ** (attempt - 1), 5))
+
+    return None, last_error
+
+
+def _warm_endpoint(
+    endpoint: str,
+    *,
+    model_id: str,
+    auth_headers: dict[str, str] | None,
+    timeout_seconds: int,
+) -> tuple[bool, float | None, str | None]:
+    import time
+
+    import requests as req
+
+    headers = {"Content-Type": "application/json"}
+    if auth_headers:
+        headers.update(auth_headers)
+
+    payload = {
+        "model": model_id,
+        "messages": [
+            {"role": "user", "content": "Reply with OK only."},
+        ],
+        "max_tokens": 8,
+        "temperature": 0,
+        "stream": False,
+    }
+    url = f"{_normalize_base_url(endpoint)}/v1/chat/completions"
+    started = time.perf_counter()
+
+    try:
+        resp = req.post(url, json=payload, headers=headers, timeout=timeout_seconds)
+        resp.raise_for_status()
+        elapsed = time.perf_counter() - started
+        return True, elapsed, None
+    except Exception as exc:  # noqa: BLE001
+        elapsed = time.perf_counter() - started
+        return False, elapsed, f"{type(exc).__name__}: {exc}"
 
 
 @click.group()
@@ -364,6 +487,44 @@ def run_cell(
 @click.option("--rate", default=4.0, type=float, help="Request rate (req/s).")
 @click.option("--model-id", default=None, help="Model ID served by the endpoint. Auto-detected if omitted.")
 @click.option(
+    "--request-timeout-seconds",
+    default=None,
+    type=int,
+    help="Per-request timeout. Defaults scale up automatically for remote and serverless endpoints.",
+)
+@click.option(
+    "--total-timeout-seconds",
+    default=None,
+    type=int,
+    help="Overall benchmark timeout. Defaults scale up automatically from request timeout and request count.",
+)
+@click.option(
+    "--detect-timeout-seconds",
+    default=_MODEL_DETECT_TIMEOUT_SECONDS,
+    show_default=True,
+    type=int,
+    help="Timeout for model auto-detection via /v1/models.",
+)
+@click.option(
+    "--model-detect-retries",
+    default=_MODEL_DETECT_RETRIES,
+    show_default=True,
+    type=int,
+    help="Additional retries for model auto-detection on cold-start-heavy endpoints.",
+)
+@click.option(
+    "--warmup/--no-warmup",
+    default=True,
+    help="Issue one short request before the measured run to warm serverless or cold endpoints.",
+)
+@click.option(
+    "--warmup-timeout-seconds",
+    default=_SERVERLESS_WARMUP_TIMEOUT_SECONDS,
+    show_default=True,
+    type=int,
+    help="Timeout for the pre-benchmark warmup request.",
+)
+@click.option(
     "--workload",
     "workload_type",
     default="simple",
@@ -385,6 +546,12 @@ def quick_bench(
     duration: int,
     rate: float,
     model_id: str | None,
+    request_timeout_seconds: int | None,
+    total_timeout_seconds: int | None,
+    detect_timeout_seconds: int,
+    model_detect_retries: int,
+    warmup: bool,
+    warmup_timeout_seconds: int,
     workload_type: str,
     api_key: str | None,
     context_bucket: str,
@@ -400,7 +567,6 @@ def quick_bench(
       isb1 quick-bench https://my-endpoint.modal.run --workload coding --sessions 8
     """
     import asyncio
-    import re
     import time
 
     from analysis.metrics import _compute_itl_gaps, _compute_tpot, _safe_percentile
@@ -414,19 +580,45 @@ def quick_bench(
 
     # Auto-detect model
     if not model_id:
-        try:
-            import requests as req
-
-            detect_headers = {}
-            if auth_headers:
-                detect_headers.update(auth_headers)
-            resp = req.get(f"{_normalize_base_url(endpoint)}/v1/models", headers=detect_headers, timeout=30)
-            data = resp.json().get("data", [])
-            model_id = data[0]["id"] if data else "unknown"
+        model_id, detect_error = _detect_model_id(
+            endpoint,
+            auth_headers=auth_headers,
+            timeout_seconds=detect_timeout_seconds,
+            retries=model_detect_retries,
+        )
+        if model_id:
             click.echo(f"Detected model: {model_id}")
-        except Exception:
+        else:
             model_id = "unknown"
-            click.echo("Could not auto-detect model. Use --model-id to specify.")
+            message = "Could not auto-detect model. Use --model-id to specify."
+            if detect_error:
+                message += f" Last error: {detect_error}"
+            click.echo(message)
+
+    if warmup and model_id != "unknown":
+        click.echo("Warming endpoint before the measured run...")
+        warm_ok, warm_elapsed, warm_error = _warm_endpoint(
+            endpoint,
+            model_id=model_id,
+            auth_headers=auth_headers,
+            timeout_seconds=warmup_timeout_seconds,
+        )
+        if warm_ok:
+            click.echo(f"Warmup completed in {warm_elapsed:.2f}s")
+        else:
+            click.echo(
+                "Warmup did not complete cleanly; continuing anyway. "
+                f"Observed after {warm_elapsed:.2f}s: {warm_error}"
+            )
+
+    if request_timeout_seconds is None:
+        request_timeout_seconds = _default_request_timeout_seconds(endpoint, workload_type, duration)
+    if total_timeout_seconds is None:
+        total_timeout_seconds = _default_total_timeout_seconds(
+            request_timeout_seconds,
+            duration,
+            num_requests,
+        )
 
     # Generate request pool based on workload type
     slo = {"ttft_p95_ms": 2000, "tpot_p95_ms": 100}
@@ -491,6 +683,12 @@ def quick_bench(
     click.echo(f"Workload: {workload_type}")
     if auth_headers:
         click.echo("Auth: Bearer token provided")
+    if _is_serverless_endpoint(endpoint):
+        click.echo("Profile: serverless endpoint heuristics enabled")
+    elif not _is_local_endpoint(endpoint):
+        click.echo("Profile: remote endpoint heuristics enabled")
+    click.echo(f"Request timeout: {request_timeout_seconds}s")
+    click.echo(f"Total timeout:   {total_timeout_seconds}s")
     click.echo()
 
     start = time.time()
@@ -505,8 +703,8 @@ def quick_bench(
             arrival_shape=None,
             seed=42,
             concurrency=sessions,
-            request_timeout_seconds=min(duration * 2, 300),
-            total_timeout_seconds=duration * 3,
+            request_timeout_seconds=request_timeout_seconds,
+            total_timeout_seconds=total_timeout_seconds,
             goodput_slo=slo,
             extra_headers=auth_headers,
         )

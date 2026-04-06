@@ -17,6 +17,7 @@ InferScope sits beside two other benchmark realities:
 - **InferenceX** is the public frontier benchmark reference outside this repo
 - **ISB-1** is the reproducible benchmark standard inside this repo
 - **InferScope** is the operator-facing deployment analysis layer
+- **Axion Optimize** or a separate optimization repo can own closed-loop tuning, rollout, rollback, and managed optimization workflows outside this repo
 
 That means InferScope should answer questions like:
 
@@ -26,6 +27,8 @@ That means InferScope should answer questions like:
 - what changed between probe A and probe B?
 
 It should not answer those questions by building a generic matrix browser, suite planner, or launch-bundle framework.
+
+It should also not answer them by becoming the deployment-changing automation layer.
 
 ## Current supported contract
 
@@ -52,7 +55,7 @@ src/inferscope/
 ├── production_target.py      # authoritative product contract
 ├── hardware/                 # GPU metadata and detection
 ├── models/                   # model metadata
-├── optimization/             # checks and recommendation helpers
+├── optimization/             # advisory checks and recommendation helpers
 ├── engines/                  # production-lane engine adapters
 ├── telemetry/                # Prometheus capture and metric normalization
 ├── profiling/                # live runtime profiling core
@@ -86,6 +89,7 @@ Rules:
 
 - `production_target.py` is the only public scope authority
 - `optimization` does not depend on benchmark orchestration
+- `optimization` is advisory inside InferScope; it does not own deployment execution
 - `telemetry` owns metric capture and normalization
 - `profiling` owns live runtime analysis
 - `benchmarks` owns workload resolution, replay, artifact persistence, and probe-plan resolution
@@ -102,10 +106,10 @@ Current flow:
 3. classify workload and memory/cache pressure heuristically
 4. run deployment checks
 5. group findings into bottlenecks
-6. preview tuning changes
+6. preview tuning recommendations
 7. optionally enrich runtime identity from `/v1/models`
 
-This is the live evidence path that should eventually feed remediation logic.
+This is the live evidence path that should eventually feed advisory diagnostics and recommendation logic. Deployment-changing automation belongs outside InferScope.
 
 ## Benchmark subsystem
 
@@ -161,6 +165,7 @@ The profiling MCP surface stays because it is product-aligned:
 
 InferScope should keep moving toward one product thesis:
 
-> explain why a real deployment is underperforming on KV reuse, offload, and disaggregated serving, then point to the next concrete remediation step.
+> explain why a real deployment is underperforming on KV reuse, offload, and disaggregated serving, then point to the next concrete recommendation.
 
 If a new abstraction does not help that job, it should not exist here.
+If it changes deployments automatically, it should not exist here either.

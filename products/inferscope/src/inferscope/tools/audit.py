@@ -27,7 +27,9 @@ async def audit_deployment(
     has_rdma: bool = False,
     split_prefill_decode: bool = False,
     allow_private: bool = True,
+    metrics_endpoint: str | None = None,
     metrics_auth: EndpointAuthConfig | None = None,
+    scrape_timeout_seconds: float = 30.0,
 ) -> dict:
     """Run all audit checks against a live inference endpoint."""
     audit_log = log.bind(
@@ -47,6 +49,7 @@ async def audit_deployment(
 
     bundle = await analyze_runtime(
         endpoint,
+        metrics_endpoint=metrics_endpoint,
         context_hints=RuntimeContextHints(
             gpu_arch=gpu_arch,
             gpu_name=gpu_name,
@@ -69,6 +72,7 @@ async def audit_deployment(
         include_identity=False,
         include_findings=True,
         include_tuning_preview=False,
+        scrape_timeout_seconds=scrape_timeout_seconds,
     )
 
     if bundle.snapshot.error:

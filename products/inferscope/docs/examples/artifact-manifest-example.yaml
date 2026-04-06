@@ -1,0 +1,10 @@
+schema_version: "1"
+artifact_kind: huggingface_weights
+model: Qwen2.5-7B-Instruct
+engine: vllm
+quantization: bf16
+tensor_parallel_size: 1
+gpu_family: ampere
+notes:
+  - Example artifact manifest for InferScope benchmark preflight validation.
+  - Use this with --artifact-manifest when validating a local model directory before benchmark launch.

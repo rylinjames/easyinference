@@ -70,16 +70,16 @@ Important implementation details:
 ```bash
 git clone <repository-url>
 cd EasyInference/products/isb1
-pip install -e ".[dev,quality]"
+uv sync --dev --extra quality --no-editable
 
 # validate config shape
-isb1 validate --sweep configs/sweep/core.yaml
+uv run --no-sync isb1 validate --sweep configs/sweep/core.yaml
 
 # inspect the planned matrix
-isb1 plan --config configs/sweep/core.yaml
+uv run --no-sync isb1 plan --config configs/sweep/core.yaml
 
 # run a single cell
-isb1 run-cell \
+uv run --no-sync isb1 run-cell \
   --gpu h100 \
   --model llama70b \
   --workload chat \
@@ -88,10 +88,47 @@ isb1 run-cell \
   --output results/
 
 # aggregate finished runs
-isb1 analyze --results-dir results/ --output analysis.json
+uv run --no-sync isb1 analyze --results-dir results/ --output analysis.json
 ```
 
 For a fuller walkthrough, see [docs/QUICKSTART.md](docs/QUICKSTART.md).
+
+If you want a stable wrapper that always uses the non-editable path, use:
+
+```bash
+./scripts/isb1.sh --help
+```
+
+## Low-cost smoke benches
+
+ISB-1 now includes a first-class smoke path for remote or serverless OpenAI-compatible endpoints.
+
+Recommended flow:
+
+```bash
+cd EasyInference/products/isb1
+uv sync --dev --no-editable
+
+uv run --no-sync isb1 quick-bench \
+  https://<endpoint> \
+  --model-id Qwen/Qwen2.5-7B-Instruct \
+  --requests 1 \
+  --duration 120
+
+uv run --no-sync isb1 quick-bench \
+  https://<endpoint> \
+  --model-id Qwen/Qwen2.5-7B-Instruct \
+  --workload coding \
+  --requests 1 \
+  --duration 120
+```
+
+What changed for this path:
+
+- model detection retries `/v1/models` instead of assuming a warm endpoint
+- one short warmup request is sent by default before measurement
+- request and total timeouts expand automatically for Modal, Lightning, and other remote endpoints
+- you can still override all timeout knobs explicitly when needed
 
 ---
 
@@ -164,11 +201,11 @@ If you want benchmark replay through an MCP, start in `products/inferscope/`.
 ## Validation
 
 ```bash
-python -m ruff check .
-python -m black --check .
-python -m pytest tests/ -v --tb=short
-python -m harness.config_validator --all-yaml --config-root configs
-python -m harness.config_validator --sweep configs/sweep/core.yaml --config-root configs
+uv run --no-sync ruff check .
+uv run --no-sync black --check .
+uv run --no-sync python -m pytest tests/ -v --tb=short
+uv run --no-sync isb1 validate --all-yaml --config-root configs
+uv run --no-sync isb1 validate --sweep configs/sweep/core.yaml --config-root configs
 ```
 
 ---

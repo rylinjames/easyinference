@@ -1,0 +1,285 @@
+{
+  "profile_version": "1",
+  "source_kind": "prometheus_runtime",
+  "endpoint": "http://localhost:8000",
+  "metrics_snapshot": {
+    "captured_at": "2026-04-05T04:02:58.034103+00:00",
+    "endpoint": "http://localhost:8000/metrics",
+    "engine": "vllm",
+    "target_name": "primary",
+    "target_role": "primary",
+    "scrape_time_ms": 46.87537399968278,
+    "error": "",
+    "raw_metrics": {},
+    "normalized_metrics": {
+      "engine": "vllm",
+      "endpoint": "http://localhost:8000/metrics",
+      "request_state": {
+        "running": 0.0,
+        "waiting": 0.0,
+        "swapped": 0.0
+      },
+      "cache": {
+        "kv_usage": 0.0,
+        "prefix_hit_rate": 0.0,
+        "cpu_usage": 0.0
+      },
+      "throughput": {
+        "prompt_tokens_total": 34.0,
+        "generation_tokens_total": 2.0,
+        "preemptions_total": 0.0,
+        "request_success_total": 0.0,
+        "gen_throughput_tps": 0.0
+      },
+      "reliability": {
+        "request_migrations_total": 0.0,
+        "disconnected_clients": 0.0,
+        "kv_active_blocks": 0.0,
+        "kv_total_blocks": 0.0
+      },
+      "disaggregation": {
+        "kvbm_offload_d2h": 0.0,
+        "kvbm_onboard_h2d": 0.0,
+        "nixl_transfer_latency_ms": null,
+        "nixl_transfer_bytes": 0.0,
+        "nixl_transfer_failures": 0.0
+      },
+      "tiering": {
+        "kvbm_host_hit_rate": 0.0,
+        "kvbm_disk_hit_rate": 0.0,
+        "grove_gpu_pct": 0.0,
+        "grove_cpu_pct": 0.0,
+        "grove_ssd_pct": 0.0,
+        "grove_evictions": 0.0
+      },
+      "lmcache": {
+        "hit_rate": 0.0,
+        "retrieve_speed_tps": 0.0
+      },
+      "slo": {
+        "ttft_violations": 0.0,
+        "itl_violations": 0.0
+      },
+      "goodput": {
+        "goodput_tps": 0.0,
+        "goodput_ratio": 0.0
+      },
+      "ttft_decomposition": {
+        "prefill_compute_ms": 690.4,
+        "queue_fraction": 0.0
+      },
+      "latency": {
+        "ttft_avg_ms": 690.4,
+        "itl_avg_ms": null,
+        "e2e_avg_ms": 692.7,
+        "queue_time_avg_ms": 0.0
+      },
+      "speculation": {
+        "acceptance_rate": 0.0
+      },
+      "scrape": {
+        "time_ms": 46.9,
+        "error": ""
+      }
+    },
+    "samples": []
+  },
+  "metrics": {
+    "engine": "vllm",
+    "endpoint": "http://localhost:8000/metrics",
+    "request_state": {
+      "running": 0.0,
+      "waiting": 0.0,
+      "swapped": 0.0
+    },
+    "cache": {
+      "kv_usage": 0.0,
+      "prefix_hit_rate": 0.0,
+      "cpu_usage": 0.0
+    },
+    "throughput": {
+      "prompt_tokens_total": 34.0,
+      "generation_tokens_total": 2.0,
+      "preemptions_total": 0.0,
+      "request_success_total": 0.0,
+      "gen_throughput_tps": 0.0
+    },
+    "reliability": {
+      "request_migrations_total": 0.0,
+      "disconnected_clients": 0.0,
+      "kv_active_blocks": 0.0,
+      "kv_total_blocks": 0.0
+    },
+    "disaggregation": {
+      "kvbm_offload_d2h": 0.0,
+      "kvbm_onboard_h2d": 0.0,
+      "nixl_transfer_latency_ms": null,
+      "nixl_transfer_bytes": 0.0,
+      "nixl_transfer_failures": 0.0
+    },
+    "tiering": {
+      "kvbm_host_hit_rate": 0.0,
+      "kvbm_disk_hit_rate": 0.0,
+      "grove_gpu_pct": 0.0,
+      "grove_cpu_pct": 0.0,
+      "grove_ssd_pct": 0.0,
+      "grove_evictions": 0.0
+    },
+    "lmcache": {
+      "hit_rate": 0.0,
+      "retrieve_speed_tps": 0.0
+    },
+    "slo": {
+      "ttft_violations": 0.0,
+      "itl_violations": 0.0
+    },
+    "goodput": {
+      "goodput_tps": 0.0,
+      "goodput_ratio": 0.0
+    },
+    "ttft_decomposition": {
+      "prefill_compute_ms": 690.4,
+      "queue_fraction": 0.0
+    },
+    "latency": {
+      "ttft_avg_ms": 690.4,
+      "itl_avg_ms": null,
+      "e2e_avg_ms": 692.7,
+      "queue_time_avg_ms": 0.0
+    },
+    "speculation": {
+      "acceptance_rate": 0.0
+    },
+    "scrape": {
+      "time_ms": 46.9,
+      "error": ""
+    }
+  },
+  "health": {
+    "status": "healthy",
+    "issues": [],
+    "issue_count": 0
+  },
+  "memory_pressure": {
+    "level": "low",
+    "kv_cache_usage": 0.0,
+    "prefix_cache_hit_rate": 0.0,
+    "preemptions_total": 0.0,
+    "cpu_cache_usage": 0.0,
+    "findings": [
+      "KV cache at 0% \u2014 underutilized. Could increase gpu_memory_utilization or serve more concurrent requests."
+    ],
+    "summary": "Memory pressure: low (KV 0%, 1 findings)"
+  },
+  "cache_effectiveness": {
+    "effectiveness": "disabled_or_no_data",
+    "prefix_hit_rate": 0.0,
+    "kv_cache_usage": 0.0,
+    "recommendations": [
+      "No cache hit data \u2014 is prefix caching enabled? vLLM V1 has zero-overhead prefix caching (always on). SGLang needs --enable-metrics to expose cache_hit_rate."
+    ],
+    "summary": "Cache effectiveness: disabled_or_no_data (hit rate: 0%, KV usage: 0%)"
+  },
+  "reliability": {
+    "level": "healthy",
+    "request_migrations_total": 0.0,
+    "disconnected_clients": 0.0,
+    "kv_active_blocks": 0.0,
+    "kv_total_blocks": 0.0,
+    "findings": [
+      "No migration, disconnect, or queue-depth reliability signals detected."
+    ],
+    "summary": "Reliability: healthy (migrations=0, disconnects=0)"
+  },
+  "workload": {
+    "mode": "chat",
+    "confidence": 0.95,
+    "signals": {
+      "prefix_reuse": "Low (0%) \u2014 likely unique prompts",
+      "ttft": "Moderate (690ms)",
+      "kv_pressure": "Low (0%) \u2014 short requests"
+    }
+  },
+  "identity": {
+    "engine": "vllm",
+    "engine_source": "metrics",
+    "adapter_name": "vllm",
+    "served_models": [
+      "Kimi-K2.5"
+    ],
+    "config_snapshot": {
+      "object": "list",
+      "data": [
+        {
+          "id": "Kimi-K2.5",
+          "object": "model",
+          "created": 1775361778,
+          "owned_by": "vllm",
+          "root": "Qwen/Qwen2.5-Coder-7B-Instruct",
+          "parent": null,
+          "max_model_len": 4096,
+          "permission": [
+            {
+              "id": "modelperm-a961bd0569721c1f",
+              "object": "model_permission",
+              "created": 1775361778,
+              "allow_create_engine": false,
+              "allow_sampling": true,
+              "allow_logprobs": true,
+              "allow_search_indices": false,
+              "allow_view": true,
+              "allow_fine_tuning": false,
+              "organization": "*",
+              "group": null,
+              "is_blocking": false
+            }
+          ]
+        }
+      ]
+    },
+    "config_error": "",
+    "notes": []
+  },
+  "audit": {
+    "findings": [],
+    "total": 0,
+    "critical": 0,
+    "warnings": 0,
+    "info": 0
+  },
+  "bottlenecks": [],
+  "tuning_preview": {
+    "mode": "preview",
+    "adjustments": [],
+    "updated_scheduler": {
+      "batched_token_budget": 8192,
+      "max_num_seqs": 256,
+      "decode_priority": 0.5,
+      "chunked_prefill": true,
+      "prefill_decode_isolation": "colocated",
+      "prefill_lane_budget": 0,
+      "decode_lane_budget": 0,
+      "max_prefill_chunk_ratio": 0.5
+    },
+    "updated_cache": {
+      "gpu_memory_utilization": 0.92,
+      "offload_policy": "cold_only",
+      "kv_compaction_trigger": 0.4,
+      "fragmentation_check": false,
+      "pcie_utilization_cap": 0.7
+    },
+    "summary": "No config adjustments suggested",
+    "error": ""
+  },
+  "reasoning": [
+    "Scraped vllm metrics from http://localhost:8000/metrics",
+    "TTFT decomposition: ~0% queue wait, ~100% prefill compute (prefill \u2248 690ms)",
+    "Classified workload as chat (95% confidence)",
+    "Runtime identity resolved with 1 served model(s)",
+    "Derived 0 audit finding(s) and 0 grouped bottleneck(s)",
+    "No config adjustments suggested"
+  ],
+  "summary": "VLLM runtime profile: 0 finding(s), 0 bottleneck(s), workload=chat, status=healthy",
+  "confidence": 0.8500000000000001,
+  "evidence": "runtime_profile"
+}

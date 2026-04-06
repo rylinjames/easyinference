@@ -96,6 +96,7 @@ uv run inferscope benchmark-plan kimi-k2-long-context-coding http://localhost:80
 
 For the full guided onboarding path, use [products/inferscope/docs/QUICKSTART.md](products/inferscope/docs/QUICKSTART.md).
 For the MCP-specific onboarding path, use [products/inferscope/docs/MCP_QUICKSTART.md](products/inferscope/docs/MCP_QUICKSTART.md).
+For reference output examples, use [products/inferscope/docs/EXAMPLE_RESULTS.md](products/inferscope/docs/EXAMPLE_RESULTS.md).
 
 ## Monorepo rules
 

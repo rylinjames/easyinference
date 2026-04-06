@@ -14,20 +14,26 @@ This guide gets you from install to a first reproducible benchmark run.
 ```bash
 git clone https://github.com/OCWC22/EasyInference.git
 cd EasyInference/products/isb1
-pip install -e ".[dev,quality]"
+uv sync --dev --extra quality --no-editable
 ```
 
 Confirm the CLI is available:
 
 ```bash
-isb1 --help
+uv run --no-sync isb1 --help
+```
+
+If you prefer a checked-in wrapper:
+
+```bash
+./scripts/isb1.sh --help
 ```
 
 ## Validate the benchmark configs
 
 ```bash
-isb1 validate --sweep configs/sweep/core.yaml
-isb1 validate --all-yaml --config-root configs
+uv run --no-sync isb1 validate --sweep configs/sweep/core.yaml
+uv run --no-sync isb1 validate --all-yaml --config-root configs
 ```
 
 This checks the benchmark matrix, config integrity, and rough memory-fit constraints.
@@ -35,7 +41,7 @@ This checks the benchmark matrix, config integrity, and rough memory-fit constra
 ## Preview the execution plan
 
 ```bash
-isb1 plan --config configs/sweep/core.yaml
+uv run --no-sync isb1 plan --config configs/sweep/core.yaml
 ```
 
 Use this before long runs. It lets you inspect the matrix without launching anything.
@@ -43,7 +49,7 @@ Use this before long runs. It lets you inspect the matrix without launching anyt
 ## Run a single cell
 
 ```bash
-isb1 run-cell \
+uv run --no-sync isb1 run-cell \
   --gpu h100 \
   --model llama70b \
   --workload chat \
@@ -64,7 +70,7 @@ What happens during a cell run:
 ## Run the core sweep
 
 ```bash
-isb1 run --config configs/sweep/core.yaml --output results/
+uv run --no-sync isb1 run --config configs/sweep/core.yaml --output results/
 ```
 
 Add `--dry-run` if you want the orchestrator plan without execution.
@@ -72,11 +78,36 @@ Add `--dry-run` if you want the orchestrator plan without execution.
 ## Aggregate results
 
 ```bash
-isb1 analyze --results-dir results/ --output analysis.json
-isb1 claims --results-dir results/
-isb1 leaderboard --analysis analysis.json
-isb1 report --analysis analysis.json --output report.html
+uv run --no-sync isb1 analyze --results-dir results/ --output analysis.json
+uv run --no-sync isb1 claims --results-dir results/
+uv run --no-sync isb1 leaderboard --analysis analysis.json
+uv run --no-sync isb1 report --analysis analysis.json --output report.html
 ```
+
+## Serverless smoke bench
+
+Use this when you want a cheap validation run against a hosted OpenAI-compatible endpoint such as Modal.
+
+```bash
+uv run --no-sync isb1 quick-bench \
+  https://<endpoint> \
+  --model-id Qwen/Qwen2.5-7B-Instruct \
+  --requests 1 \
+  --duration 120
+
+uv run --no-sync isb1 quick-bench \
+  https://<endpoint> \
+  --model-id Qwen/Qwen2.5-7B-Instruct \
+  --workload coding \
+  --requests 1 \
+  --duration 120
+```
+
+Notes:
+
+- `quick-bench` now retries model detection and sends a short warmup request by default
+- remote and serverless endpoints get larger timeout defaults automatically
+- pass `--no-warmup` or explicit timeout flags only when you have a reason to override the defaults
 
 ## What to inspect after a run
 

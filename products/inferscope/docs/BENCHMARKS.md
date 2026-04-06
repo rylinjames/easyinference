@@ -6,10 +6,13 @@ Its benchmark package is a **narrow probe layer** for one operator-facing produc
 
 If you want broad benchmark coverage, use **ISB-1**.
 If you want deployment-specific KV/disaggregation diagnostics, use **InferScope**.
+If you want closed-loop optimization or deployment-changing automation, use a separate optimization product or repo.
 
 ## Scope
 
-InferScope benchmark support is intentionally limited to:
+InferScope benchmark support is intentionally split into three surfaces:
+
+### Production-validated lane
 
 - **model:** `Kimi-K2.5`
 - **production engine:** `dynamo`
@@ -19,11 +22,28 @@ InferScope benchmark support is intentionally limited to:
 - **topologies:** `single_endpoint`, `prefill_decode_split`
 - **cache strategy:** `lmcache`
 
-Supported probe experiments:
+Production experiments:
 
 - `dynamo-aggregated-lmcache-kimi-k2`
 - `vllm-disagg-prefill-lmcache`
 - `dynamo-disagg-lmcache-kimi-k2`
+
+### Benchmark-supported public lanes
+
+- `coding-long-context` on `Qwen3.5-32B`
+- larger Qwen coder comparison lanes used for benchmark-supported replay work
+
+### Preview smoke lane
+
+- **model:** `Qwen2.5-7B-Instruct`
+- **engine:** `vllm`
+- **workload pack:** `coding-smoke`
+- **GPU:** `a10g`
+- **purpose:** endpoint health, observability, CLI/MCP validation
+
+Smoke experiment:
+
+- `vllm-single-endpoint-smoke`
 
 The source of truth is `src/inferscope/production_target.py`.
 
@@ -37,6 +57,8 @@ The benchmark layer now exists to do four things:
 4. compare two artifacts to quantify change
 
 That is it.
+
+It is the evidence layer for deployment changes, not the system that executes those changes.
 
 It does **not** exist to:
 
@@ -94,6 +116,16 @@ uv run inferscope benchmark \
 uv run inferscope benchmark-compare aggregated.json disagg.json
 ```
 
+Preview smoke workflow:
+
+```bash
+uv run inferscope benchmark-plan \
+  coding-smoke \
+  https://<endpoint> \
+  --gpu a10g \
+  --num-gpus 1
+```
+
 ## Probe resolution
 
 Both CLI and MCP now route through:
@@ -110,7 +142,7 @@ That module is the shared contract for:
 
 Important rules:
 
-- blank `experiment` defaults to `dynamo-aggregated-lmcache-kimi-k2`
+- blank `experiment` defaults to the correct lane for the chosen workload pack
 - unsupported workload packs are rejected
 - unsupported experiments are rejected
 - model/engine are derived from the supported experiment and workload, not public override knobs
@@ -173,6 +205,8 @@ The intended operator loop is:
 3. compare artifacts or compare runtime vs probe behavior
 4. decide whether KV policy, cache routing, or topology changed anything meaningful
 
+The next step after that may be a recommendation to test or promote a change, but keep/revert automation belongs outside InferScope.
+
 ## What is still missing
 
 The benchmark layer is narrower now, but it is not finished.
@@ -182,7 +216,7 @@ High-value missing pieces are still:
 - deeper KV-tier and offload metrics in artifacts
 - phase-aware telemetry for prefill vs decode vs handoff
 - stronger provenance on artifact manifests
-- gap-analysis logic that turns runtime + probe evidence into concrete remediation steps
+- gap-analysis logic that turns runtime + probe evidence into concrete recommended next steps
 
 That missing work is fine.
 What is no longer fine is pretending InferScope needs a generic benchmark framework while those operator-grade pieces are still absent.

@@ -1,0 +1,28 @@
+{
+  "name": "kimi-dynamo-production-reference-corpus",
+  "date": "2026-04-05",
+  "status": "reference-corpus",
+  "production_target_name": "dynamo_long_context_coding",
+  "lane": {
+    "class": "production_validated",
+    "claim_scope": "production_comparable",
+    "model_support_tier": "production_validated",
+    "model": "Kimi-K2.5",
+    "workload_pack": "kimi-k2-long-context-coding",
+    "experiment": "dynamo-aggregated-lmcache-kimi-k2"
+  },
+  "fixtures": {
+    "baseline_artifact": "docs/examples/benchmark-artifact-baseline.json",
+    "candidate_artifact": "docs/examples/benchmark-artifact-candidate.json",
+    "comparison": "docs/examples/benchmark-comparison-example.json"
+  },
+  "acceptance_expectations": [
+    "Artifacts must carry builtin workload and experiment provenance.",
+    "Reference lane must resolve to production_validated / production_comparable.",
+    "Comparison output must remain comparable within the same Kimi/Dynamo lane."
+  ],
+  "limitations": [
+    "This corpus is synthetic reference data, not a live benchmark export.",
+    "It exists to pin the canonical production-lane JSON shape and comparison semantics in version control."
+  ]
+}

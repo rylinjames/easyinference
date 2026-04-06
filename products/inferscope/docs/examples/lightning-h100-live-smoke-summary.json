@@ -1,0 +1,54 @@
+{
+  "name": "inferscope-h100-live-smoke",
+  "date": "2026-04-05",
+  "status": "authenticated-export-complete",
+  "experiment_url": "https://lightning.ai/romirj/easyinference-evaluation-project/experiments/inferscope-h100-live-smoke",
+  "endpoint": "http://localhost:8000",
+  "hardware": {
+    "physical_gpu_shape": "1x H100",
+    "benchmark_flags": {
+      "gpu": "h100",
+      "num_gpus": 8
+    }
+  },
+  "served_model": {
+    "hf_model": "Qwen/Qwen2.5-Coder-7B-Instruct",
+    "served_alias": "Kimi-K2.5"
+  },
+  "benchmark_summary": {
+    "total_requests": 2,
+    "succeeded_requests": 2,
+    "failed_requests": 0,
+    "concurrency": 4,
+    "wall_time_ms": 1726.5709110001808,
+    "latency_avg_ms": 863.05261050029,
+    "latency_p50_ms": 863.05261050029,
+    "latency_p95_ms": 890.1545431503109,
+    "latency_p99_ms": 892.5636038303128,
+    "ttft_avg_ms": 53.120283000225754,
+    "ttft_p90_ms": 77.2092006001003,
+    "ttft_p95_ms": 80.22031530008462,
+    "ttft_p99_ms": 82.62920706007208,
+    "prompt_tokens": 2443,
+    "completion_tokens": 256,
+    "total_tokens": 2699,
+    "metrics_targets_total": 2,
+    "metrics_targets_with_errors": 2,
+    "metrics_capture_complete": false
+  },
+  "remote_artifact_paths": {
+    "run_dir": "/home/zeus/content/easyinference/products/inferscope/lightning_logs/inferscope-h100-live-smoke/",
+    "benchmark_json": "/teamspace/studios/this_studio/.inferscope/benchmarks/kimi-k2-long-context-coding-6dcf5b04e52d-kimi-k2-long-context-coding.json"
+  },
+  "local_exported_files": {
+    "runtime_profile": "docs/examples/lightning-h100-live-smoke-runtime-profile.json",
+    "benchmark_plan": "docs/examples/lightning-h100-live-smoke-benchmark-plan.json",
+    "benchmark_artifact": "docs/examples/lightning-h100-live-smoke-benchmark-artifact.json",
+    "console_output": "validations/05-2026-04-05-lightning-h100-live-smoke-console.txt"
+  },
+  "limitations": [
+    "This was a plumbing validation run, not a truthful Kimi 8-GPU benchmark.",
+    "Metrics capture was incomplete because the test setup used a single local vLLM endpoint rather than the production-style metrics layout expected by the probe plan.",
+    "The authenticated export happened after the run, so it preserves the experiment artifacts but not the original live remote studio filesystem state."
+  ]
+}

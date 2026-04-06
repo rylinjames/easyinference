@@ -29,7 +29,7 @@ It is not meant to be a generic metrics browser.
 3. classify workload heuristically
 4. run deployment checks
 5. group findings into bottlenecks
-6. preview tuning changes
+6. preview tuning recommendations
 7. optionally enrich runtime identity from `/v1/models`
 
 ## Current scope
@@ -40,6 +40,8 @@ The product contract is narrowed around:
 - Hopper / Blackwell (`h100`, `h200`, `b200`, `b300`)
 - `dynamo` as the production lane
 - `vllm` as the comparison lane
+
+For low-cost validation, the same profiling surface is also used against preview smoke endpoints such as the checked-in Modal `a10g` demo, typically with `--metrics-endpoint` and a higher `--scrape-timeout-seconds`.
 
 The profiling system is still broader internally than the public product contract, but the public direction is clear: profiling should support deployment diagnosis for the supported product lane first.
 
@@ -58,6 +60,8 @@ Current runtime profiles include:
 - optional runtime identity enrichment
 
 The runtime profile uses the same `MetricSnapshot` schema family as probe artifacts so live runtime evidence and saved benchmark evidence can converge over time.
+
+This profiling surface is advisory. It can point to likely next tests or configuration changes, but automated execution belongs outside InferScope.
 
 ## CLI examples
 
@@ -90,6 +94,6 @@ It does **not** yet provide the full product-grade evidence model InferScope eve
 - phase-aware prefill/decode/handoff timing
 - explicit LMCache / offload / transfer metrics everywhere
 - persistent runtime profiles by default
-- remediation logic that closes the loop automatically
+- stronger recommendation logic that closes the evidence loop for operators
 
 That missing work belongs under `src/inferscope/profiling/`, `src/inferscope/telemetry/`, and future diagnostics layers — not in a generic dashboard system.

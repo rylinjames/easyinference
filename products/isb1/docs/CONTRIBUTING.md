@@ -52,17 +52,17 @@ Examples:
 ```bash
 git clone <repository-url>
 cd EasyInference/products/isb1
-pip install -e ".[dev,quality]"
+uv sync --dev --extra quality --no-editable
 ```
 
 ## Required local checks
 
 ```bash
-python -m ruff check .
-python -m black --check .
-python -m pytest tests/ -v --tb=short
-python -m harness.config_validator --all-yaml --config-root configs
-python -m harness.config_validator --sweep configs/sweep/core.yaml --config-root configs
+uv run --no-sync ruff check .
+uv run --no-sync black --check .
+uv run --no-sync python -m pytest tests/ -v --tb=short
+uv run --no-sync isb1 validate --all-yaml --config-root configs
+uv run --no-sync isb1 validate --sweep configs/sweep/core.yaml --config-root configs
 ```
 
 ## Pull request expectations

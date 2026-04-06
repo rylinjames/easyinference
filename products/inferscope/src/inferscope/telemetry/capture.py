@@ -54,9 +54,15 @@ async def capture_endpoint_telemetry(
     expected_engine: str | None = None,
     metrics_auth: EndpointAuthConfig | None = None,
     include_samples: bool = True,
+    scrape_timeout_seconds: float = 30.0,
 ) -> CapturedTelemetry:
     """Capture raw and normalized metrics for one endpoint."""
-    scrape = await scrape_metrics(endpoint, allow_private=allow_private, auth=metrics_auth)
+    scrape = await scrape_metrics(
+        endpoint,
+        allow_private=allow_private,
+        auth=metrics_auth,
+        timeout_seconds=scrape_timeout_seconds,
+    )
     normalized = normalize(scrape)
     error = scrape.error
     if expected_engine and scrape.engine not in {"unknown", expected_engine}:
@@ -86,6 +92,7 @@ async def capture_endpoint_snapshot(
     expected_engine: str | None = None,
     metrics_auth: EndpointAuthConfig | None = None,
     include_samples: bool = True,
+    scrape_timeout_seconds: float = 30.0,
 ) -> MetricSnapshot:
     """Compatibility wrapper returning just the snapshot."""
     captured = await capture_endpoint_telemetry(
@@ -96,6 +103,7 @@ async def capture_endpoint_snapshot(
         expected_engine=expected_engine,
         metrics_auth=metrics_auth,
         include_samples=include_samples,
+        scrape_timeout_seconds=scrape_timeout_seconds,
     )
     return captured.snapshot
 
@@ -107,6 +115,7 @@ async def capture_metrics_targets(
     metrics_auth: EndpointAuthConfig | None = None,
     metrics_auth_overrides: dict[str, EndpointAuthConfig] | None = None,
     include_samples: bool = True,
+    scrape_timeout_seconds: float = 30.0,
 ) -> list[MetricSnapshot]:
     """Capture all metrics targets concurrently while preserving declared order."""
     tasks = [
@@ -118,6 +127,7 @@ async def capture_metrics_targets(
             expected_engine=target.expected_engine,
             metrics_auth=(metrics_auth_overrides or {}).get(target.name, metrics_auth),
             include_samples=include_samples,
+            scrape_timeout_seconds=scrape_timeout_seconds,
         )
         for target in targets
     ]

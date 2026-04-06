@@ -9,14 +9,21 @@ from typing import Literal
 import yaml  # type: ignore[import-untyped]
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from inferscope.benchmarks.models import WorkloadPack
+from inferscope.benchmarks.models import BenchmarkLaneReference, BenchmarkSourceReference, WorkloadPack
+from inferscope.benchmarks.preflight import BenchmarkPreflightValidation
 from inferscope.benchmarks.support import BenchmarkSupportProfile
+from inferscope.models.registry import get_model_variant
+from inferscope.optimization.serving_profile import ModelClass
 
 MetricTargetRole = Literal["primary", "router", "prefill", "decode", "cache", "other"]
 TopologyMode = Literal["single_endpoint", "prefill_decode_split", "router_prefill_decode"]
 SessionRoutingMode = Literal["unknown", "none", "sticky", "hash"]
 CacheStrategy = Literal["unknown", "none", "prefix_only", "lmcache", "hicache", "offloading_connector", "nixl"]
 CacheTier = Literal["gpu_hbm", "grace_coherent", "cpu_dram", "local_ssd", "remote_cache"]
+
+
+def _known_model_classes() -> set[str]:
+    return {model_class.value for model_class in ModelClass}
 
 
 class MetricCaptureTargetSpec(BaseModel):
@@ -144,6 +151,32 @@ class BenchmarkExperimentSpec(BaseModel):
         names = [target.name for target in self.metrics_targets]
         if len(names) != len(set(names)):
             raise ValueError("metric target names must be unique")
+        invalid_model_classes = sorted(set(self.target_model_classes) - _known_model_classes())
+        if invalid_model_classes:
+            raise ValueError(
+                "BenchmarkExperimentSpec.target_model_classes contains unknown classes: "
+                f"{', '.join(invalid_model_classes)}"
+            )
+        if self.model:
+            variant = get_model_variant(self.model)
+            if variant is None:
+                raise ValueError(
+                    "BenchmarkExperimentSpec.model "
+                    f"'{self.model}' does not resolve to a known model variant. "
+                    "Register the model first or fix the experiment spec."
+                )
+            if self.target_model_classes and variant.model_class.value not in self.target_model_classes:
+                raise ValueError(
+                    "BenchmarkExperimentSpec.model "
+                    f"'{variant.name}' resolves to class '{variant.model_class.value}', "
+                    "which is not allowed by target_model_classes."
+                )
+        for target in self.metrics_targets:
+            if target.expected_engine and target.expected_engine != self.engine:
+                raise ValueError(
+                    f"Metric target '{target.name}' expects engine '{target.expected_engine}', "
+                    f"but the experiment engine is '{self.engine}'."
+                )
         return self
 
     @classmethod
@@ -169,6 +202,9 @@ class BenchmarkRunPlan(BaseModel):
 
     source_experiment: str | None = None
     workload_ref: str
+    workload_source: BenchmarkSourceReference | None = None
+    experiment_source: BenchmarkSourceReference | None = None
+    reference_lane: BenchmarkLaneReference | None = None
     request_endpoint: str
     model: str
     concurrency: int = Field(ge=1, le=1024)
@@ -177,6 +213,7 @@ class BenchmarkRunPlan(BaseModel):
     cache: BenchmarkCacheMetadata = Field(default_factory=BenchmarkCacheMetadata)
     execution: BenchmarkExecutionProfile = Field(default_factory=BenchmarkExecutionProfile)
     support: BenchmarkSupportProfile | None = None
+    preflight_validation: BenchmarkPreflightValidation | None = None
     metrics_targets: list[ResolvedMetricCaptureTarget] = Field(default_factory=list)
     tags: list[str] = Field(default_factory=list)
 
@@ -296,6 +333,10 @@ def build_run_plan(
     metrics_targets: list[ResolvedMetricCaptureTarget] | None = None,
     execution: BenchmarkExecutionProfile | None = None,
     support: BenchmarkSupportProfile | None = None,
+    preflight_validation: BenchmarkPreflightValidation | None = None,
+    workload_source: BenchmarkSourceReference | None = None,
+    experiment_source: BenchmarkSourceReference | None = None,
+    reference_lane: BenchmarkLaneReference | None = None,
 ) -> BenchmarkRunPlan:
     """Resolve workload, experiment defaults, and runtime overrides into one run plan."""
     selected_model = model or (experiment.model if experiment else None) or workload.model
@@ -360,6 +401,9 @@ def build_run_plan(
     return BenchmarkRunPlan(
         source_experiment=experiment.name if experiment else None,
         workload_ref=workload_ref,
+        workload_source=workload_source,
+        experiment_source=experiment_source,
+        reference_lane=reference_lane,
         request_endpoint=request_endpoint,
         model=selected_model,
         concurrency=effective_concurrency,
@@ -368,6 +412,7 @@ def build_run_plan(
         cache=cache,
         execution=execution or BenchmarkExecutionProfile(),
         support=support,
+        preflight_validation=preflight_validation,
         metrics_targets=resolved_targets,
         tags=list(experiment.tags) if experiment else [],
     )

@@ -17,6 +17,7 @@ import httpx
 from inferscope.benchmarks.experiments import BenchmarkExecutionProfile, BenchmarkRunPlan
 from inferscope.benchmarks.models import (
     BenchmarkArtifact,
+    BenchmarkArtifactProvenance,
     BenchmarkRequestResult,
     BenchmarkSummary,
     MetricSnapshot,
@@ -903,6 +904,16 @@ async def run_benchmark_runtime(
         started_at=started_at,
         completed_at=completed_at,
         run_plan=run_plan_payload,
+        provenance=BenchmarkArtifactProvenance(
+            workload=run_plan.workload_source
+            or {
+                "reference": run_plan.workload_ref,
+                "resolved_path": run_plan.workload_ref,
+                "source_kind": "builtin",
+            },
+            experiment=run_plan.experiment_source,
+            lane=run_plan.reference_lane,
+        ),
         metrics_before=primary_before,
         metrics_after=primary_after,
         metrics_before_targets=metrics_before_targets,

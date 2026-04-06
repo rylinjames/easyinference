@@ -27,11 +27,14 @@ InferScope should be the fastest path from a deployment question to concrete evi
 3. run the probe against the endpoint
 4. save an artifact
 5. compare artifacts before and after a change
-6. connect runtime evidence to the next remediation step
+6. connect runtime evidence to the next recommended step
+
+InferScope can recommend what to test next.
+It should not own optimization-session versioning, rollout or rollback control, or deployment-changing automation. Those belong in Axion Optimize or a separate optimization repo.
 
 ## Current implementation stance
 
-The supported benchmark lane is deliberately narrow:
+The production-validated benchmark lane is deliberately narrow:
 
 - model: `Kimi-K2.5`
 - production engine: `dynamo`
@@ -42,7 +45,12 @@ The supported benchmark lane is deliberately narrow:
   - `vllm-disagg-prefill-lmcache`
   - `dynamo-disagg-lmcache-kimi-k2`
 
-The default probe path is the aggregated Dynamo lane.
+InferScope also keeps two smaller surfaces:
+
+- benchmark-supported public-model comparison lanes such as `coding-long-context`
+- a preview-only low-cost smoke lane: `coding-smoke` on `Qwen2.5-7B-Instruct` + `a10g`
+
+Default plan resolution now follows the workload pack instead of forcing everything into the aggregated Kimi lane.
 
 ## What was removed
 
@@ -81,7 +89,7 @@ Priority order:
 2. stronger provenance and reproducibility data in artifact manifests
 3. phase-aware telemetry for prefill, handoff, and decode
 4. gap-analysis logic that explains why production misses frontier behavior
-5. remediation logic that turns those gaps into concrete actions
+5. recommendation logic that turns those gaps into concrete next steps
 
 ## Design test
 

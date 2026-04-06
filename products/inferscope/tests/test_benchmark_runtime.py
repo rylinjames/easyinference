@@ -108,6 +108,9 @@ async def test_run_openai_replay_records_observed_runtime_metrics() -> None:
     observed = (artifact.run_plan or {}).get("observed_runtime", {})
     assert artifact.summary.succeeded == 2
     assert request_counter["count"] == 3  # one warmup + two measured requests
+    assert artifact.provenance is not None
+    assert artifact.provenance.workload.reference == workload.name
+    assert artifact.provenance.workload.source_kind == "builtin"
     assert observed["request_throughput_rps"] > 0
     assert observed["tool_parse_success_rate"] == 1.0
     assert observed["ttft_ms"]["p95"] is not None
@@ -174,5 +177,6 @@ async def test_run_openai_replay_skips_later_session_requests_after_failure() ->
 
     assert artifact.summary.succeeded == 1
     assert artifact.summary.failed == 2
+    assert artifact.provenance is not None
     assert artifact.results[1].status == "error"
     assert "Skipped because a prior request in the same session failed" in artifact.results[1].error
