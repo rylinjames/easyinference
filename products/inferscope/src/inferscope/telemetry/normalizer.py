@@ -55,6 +55,19 @@ class NormalizedMetrics:
     response_bytes_total: float = 0.0  # dynamo_component_response_bytes_total
     component_uptime_seconds: float = 0.0
     disconnected_clients: float = 0.0
+
+    # KV block counters. NOTE on `kv_active_blocks`: there is NO
+    # `dynamo_component_active_blocks` metric in Dynamo — verified
+    # against lib/runtime/src/metrics/prometheus_names.rs (the kvstats
+    # module defines only TOTAL_BLOCKS and GPU_CACHE_USAGE_PERCENT) and
+    # against the Python emission site at
+    # components/src/dynamo/common/utils/prometheus.py:322-335 which
+    # registers exactly two KV-stats gauges. The field is kept on this
+    # dataclass because downstream profiling code consumes it, but for
+    # Dynamo deployments it stays at 0.0 unless an operator wires a
+    # vLLM/SGLang worker scrape that emits it directly. Active blocks
+    # can also be derived as `kv_total_blocks * kv_cache_usage` if the
+    # absolute count is needed.
     kv_active_blocks: float = 0.0
     kv_total_blocks: float = 0.0
 
@@ -357,15 +370,29 @@ def normalize(scrape: ScrapeResult) -> NormalizedMetrics:
             "dynamo_component_inflight_requests"
         )
         m.requests_waiting = scrape.get("dynamo_frontend_queued_requests")
-        # There is no `kvstats` segment in real Dynamo metric names; the
-        # registration prefix is just `dynamo_component_`. Verified against
-        # the live disagg-dashboard.json PromQL queries and the bare
-        # constants in lib/runtime/src/metrics/prometheus_names.rs.
+        # KV cache usage: emitted by decode workers as
+        # dynamo_component_gpu_cache_usage_percent. Note: per
+        # deploy/observability/grafana_dashboards/DASHBOARD_METRICS.md,
+        # in disaggregated mode prefill workers do NOT expose this
+        # metric — only decode workers do. The fallback to
+        # vllm:gpu_cache_usage_perc covers the case where an operator
+        # also scrapes a vLLM worker endpoint directly.
         m.kv_cache_usage = scrape.get("dynamo_component_gpu_cache_usage_percent") or scrape.get(
             "vllm:gpu_cache_usage_perc"
         )
-        m.prefix_cache_hit_rate = scrape.get("dynamo_component_gpu_prefix_cache_hit_rate") or scrape.get(
-            "vllm:gpu_prefix_cache_hit_rate"
+        # Prefix cache hit rate: Dynamo does NOT emit a worker-side
+        # `dynamo_component_gpu_prefix_cache_hit_rate` metric (verified
+        # by exhaustive grep across the entire ai-dynamo/dynamo repo).
+        # The closest router-side equivalent is the histogram
+        # dynamo_component_router_kv_hit_rate, which measures the
+        # fraction of input tokens the router found in any worker's
+        # cache before dispatching the request. We use it here as the
+        # primary signal and fall back to the vLLM worker prefix cache
+        # hit rate if a vLLM worker is also being scraped.
+        m.prefix_cache_hit_rate = (
+            scrape.get_histogram_avg("dynamo_component_router_kv_hit_rate")
+            or scrape.get("vllm:gpu_prefix_cache_hit_rate")
+            or 0.0
         )
         m.prompt_tokens_total = scrape.get("vllm:prompt_tokens_total")
         m.generation_tokens_total = scrape.get("dynamo_frontend_output_tokens_total") or scrape.get(
@@ -393,7 +420,6 @@ def normalize(scrape: ScrapeResult) -> NormalizedMetrics:
         m.response_bytes_total = scrape.get("dynamo_component_response_bytes_total")
         m.component_uptime_seconds = scrape.get("dynamo_component_uptime_seconds")
         m.disconnected_clients = scrape.get("dynamo_frontend_disconnected_clients")
-        m.kv_active_blocks = scrape.get("dynamo_component_active_blocks")
         m.kv_total_blocks = scrape.get("dynamo_component_total_blocks")
         # KVBM tiering metrics — only present if the operator launched
         # Dynamo with DYN_KVBM_METRICS=true and added the KVBM /metrics

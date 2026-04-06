@@ -131,17 +131,23 @@ DYNAMO_METRICS = {
     "dynamo_component_uptime_seconds": "Component uptime in seconds",
     "dynamo_component_kv_publisher_engines_dropped_events_total":
         "KV publisher dropped events — indicates the router's cache view is stale",
-    # KV-stats metrics emitted by the worker/router. Note: there is NO
-    # `kvstats` segment in the real metric names. The bare constants in
-    # the Dynamo source (lib/runtime/src/metrics/prometheus_names.rs)
-    # are `active_blocks`, `total_blocks`, `gpu_cache_usage_percent`,
-    # and `gpu_prefix_cache_hit_rate`; they get the `dynamo_component_`
-    # prefix at registration time. Verified against the live PromQL
-    # queries in deploy/observability/grafana_dashboards/disagg-dashboard.json.
-    "dynamo_component_active_blocks": "Active KV blocks on the worker",
-    "dynamo_component_total_blocks": "Total KV blocks on the worker",
-    "dynamo_component_gpu_cache_usage_percent": "Worker GPU KV cache utilization",
-    "dynamo_component_gpu_prefix_cache_hit_rate": "Worker GPU prefix cache hit rate",
+    # KV-stats metrics emitted by decode workers via the
+    # LLMBackendMetrics class in
+    # components/src/dynamo/common/utils/prometheus.py:303-342. Note
+    # that the `kvstats` Rust module in
+    # lib/runtime/src/metrics/prometheus_names.rs declares ONLY two
+    # KV-stats constants (`total_blocks` and `gpu_cache_usage_percent`)
+    # — there is no `active_blocks` and no `gpu_prefix_cache_hit_rate`
+    # in the Dynamo source. Earlier revisions of this dict carried both
+    # `dynamo_component_active_blocks` and
+    # `dynamo_component_gpu_prefix_cache_hit_rate`; both were
+    # invented and have been removed. Active blocks can be derived
+    # client-side as `total_blocks * gpu_cache_usage_percent` if a
+    # downstream consumer needs the absolute count.
+    # Note: per DASHBOARD_METRICS.md, in disaggregated mode prefill
+    # workers do NOT expose these metrics — only decode workers do.
+    "dynamo_component_total_blocks": "Total KV blocks on the worker (decode-side only in disagg mode)",
+    "dynamo_component_gpu_cache_usage_percent": "Worker GPU KV cache utilization (decode-side only in disagg mode)",
     "dynamo_component_errors_total": "Total backend component errors",
     "dynamo_component_kv_cache_events_applied": "Count of KV cache events applied by the router",
     # --- Backend component-router histograms (Dynamo mirrors router metrics ---

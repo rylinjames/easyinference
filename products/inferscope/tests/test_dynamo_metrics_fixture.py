@@ -213,10 +213,8 @@ def test_fixture_parses_all_expected_metric_families() -> None:
         "dynamo_frontend_model_total_kv_blocks",
         "dynamo_frontend_model_max_num_seqs",
         "dynamo_frontend_model_context_length",
-        "dynamo_component_active_blocks",
         "dynamo_component_total_blocks",
         "dynamo_component_gpu_cache_usage_percent",
-        "dynamo_component_gpu_prefix_cache_hit_rate",
         "dynamo_component_errors_total",
         "dynamo_component_kv_cache_events_applied",
         "dynamo_router_overhead_total_ms_sum",
@@ -250,12 +248,17 @@ def test_healthy_fixture_normalizes_frontend_latency_fields() -> None:
     assert abs(m.e2e_avg_s - 1.2) < 1e-6
 
 
-def test_healthy_fixture_normalizes_kvstats() -> None:
+def test_healthy_fixture_normalizes_kv_cache_signals() -> None:
     scrape = _load_healthy_fixture()
     m = normalize(scrape)
+    # kv_cache_usage from dynamo_component_gpu_cache_usage_percent
     assert abs(m.kv_cache_usage - 0.50) < 1e-6
-    assert abs(m.prefix_cache_hit_rate - 0.72) < 1e-6
-    assert m.kv_active_blocks == 8100.0
+    # prefix_cache_hit_rate is now sourced from
+    # dynamo_component_router_kv_hit_rate (router-side approximation),
+    # not the fictional dynamo_component_gpu_prefix_cache_hit_rate.
+    # The fixture's router_kv_hit_rate has sum=7100, count=10000 -> 0.71
+    assert abs(m.prefix_cache_hit_rate - 0.71) < 1e-6
+    # Total blocks from dynamo_component_total_blocks
     assert m.kv_total_blocks == 16384.0
 
 

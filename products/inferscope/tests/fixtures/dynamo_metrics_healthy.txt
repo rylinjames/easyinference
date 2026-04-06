@@ -151,54 +151,59 @@ dynamo_frontend_worker_last_input_sequence_tokens{worker_id="w1",dp_rank="0",wor
 dynamo_frontend_worker_last_inter_token_latency_seconds{worker_id="w0",dp_rank="0",worker_type="decode"} 0.019
 dynamo_frontend_worker_last_inter_token_latency_seconds{worker_id="w1",dp_rank="0",worker_type="decode"} 0.021
 
+# NOTE: The component label values are `prefill` / `backend` / `frontend`
+# per DASHBOARD_METRICS.md and the Grafana queries in
+# disagg-dashboard.json. Earlier revisions of this fixture used
+# `dynamo_component="worker"` which is not a real Dynamo label value.
+# This fixture represents an aggregated (single-endpoint) deployment so
+# the worker role is `backend` (decode worker doing both prefill and
+# decode locally).
+
 # HELP dynamo_component_inflight_requests Inflight requests at backend
 # TYPE dynamo_component_inflight_requests gauge
-dynamo_component_inflight_requests{dynamo_namespace="default",dynamo_component="worker",dynamo_endpoint="generate"} 12
+dynamo_component_inflight_requests{dynamo_namespace="default",dynamo_component="backend",dynamo_endpoint="generate"} 12
 
 # HELP dynamo_component_requests_total Total backend requests
 # TYPE dynamo_component_requests_total counter
-dynamo_component_requests_total{dynamo_namespace="default",dynamo_component="worker",dynamo_endpoint="generate"} 10000
+dynamo_component_requests_total{dynamo_namespace="default",dynamo_component="backend",dynamo_endpoint="generate"} 10000
 
 # HELP dynamo_component_request_duration_seconds Backend request duration histogram
 # TYPE dynamo_component_request_duration_seconds histogram
-dynamo_component_request_duration_seconds_sum{dynamo_namespace="default",dynamo_component="worker",dynamo_endpoint="generate"} 11500
-dynamo_component_request_duration_seconds_count{dynamo_namespace="default",dynamo_component="worker",dynamo_endpoint="generate"} 10000
+dynamo_component_request_duration_seconds_sum{dynamo_namespace="default",dynamo_component="backend",dynamo_endpoint="generate"} 11500
+dynamo_component_request_duration_seconds_count{dynamo_namespace="default",dynamo_component="backend",dynamo_endpoint="generate"} 10000
 
 # HELP dynamo_component_request_bytes_total Total request payload bytes
 # TYPE dynamo_component_request_bytes_total counter
-dynamo_component_request_bytes_total{dynamo_namespace="default",dynamo_component="worker",dynamo_endpoint="generate"} 41943040
+dynamo_component_request_bytes_total{dynamo_namespace="default",dynamo_component="backend",dynamo_endpoint="generate"} 41943040
 
 # HELP dynamo_component_response_bytes_total Total response payload bytes
 # TYPE dynamo_component_response_bytes_total counter
-dynamo_component_response_bytes_total{dynamo_namespace="default",dynamo_component="worker",dynamo_endpoint="generate"} 104857600
+dynamo_component_response_bytes_total{dynamo_namespace="default",dynamo_component="backend",dynamo_endpoint="generate"} 104857600
 
 # HELP dynamo_component_uptime_seconds Component uptime
 # TYPE dynamo_component_uptime_seconds gauge
-dynamo_component_uptime_seconds{dynamo_namespace="default",dynamo_component="worker",dynamo_endpoint="generate"} 3600
+dynamo_component_uptime_seconds{dynamo_namespace="default",dynamo_component="backend",dynamo_endpoint="generate"} 3600
 
 # HELP dynamo_component_kv_publisher_engines_dropped_events_total Dropped KV publisher events
 # TYPE dynamo_component_kv_publisher_engines_dropped_events_total counter
-dynamo_component_kv_publisher_engines_dropped_events_total{dynamo_namespace="default",dynamo_component="worker"} 0
+dynamo_component_kv_publisher_engines_dropped_events_total{dynamo_namespace="default",dynamo_component="backend"} 0
 
-# HELP dynamo_component_active_blocks Active KV blocks
-# TYPE dynamo_component_active_blocks gauge
-dynamo_component_active_blocks{dynamo_component="worker"} 8100
+# Note: dynamo_component_total_blocks and dynamo_component_gpu_cache_usage_percent
+# are emitted via the LLMBackendMetrics class with label set
+# {model, dynamo_component, dp_rank}. They are decode-worker-only in
+# disaggregated mode.
 
 # HELP dynamo_component_total_blocks Total KV blocks
 # TYPE dynamo_component_total_blocks gauge
-dynamo_component_total_blocks{dynamo_component="worker"} 16384
+dynamo_component_total_blocks{model="Kimi-K2.5",dynamo_component="backend",dp_rank="0"} 16384
 
 # HELP dynamo_component_gpu_cache_usage_percent GPU KV cache usage
 # TYPE dynamo_component_gpu_cache_usage_percent gauge
-dynamo_component_gpu_cache_usage_percent{dynamo_component="worker"} 0.50
-
-# HELP dynamo_component_gpu_prefix_cache_hit_rate GPU prefix cache hit rate
-# TYPE dynamo_component_gpu_prefix_cache_hit_rate gauge
-dynamo_component_gpu_prefix_cache_hit_rate{dynamo_component="worker"} 0.72
+dynamo_component_gpu_cache_usage_percent{model="Kimi-K2.5",dynamo_component="backend",dp_rank="0"} 0.50
 
 # HELP dynamo_component_errors_total Total backend errors
 # TYPE dynamo_component_errors_total counter
-dynamo_component_errors_total{dynamo_namespace="default",dynamo_component="worker",dynamo_endpoint="generate"} 5
+dynamo_component_errors_total{dynamo_namespace="default",dynamo_component="backend",dynamo_endpoint="generate"} 5
 
 # HELP dynamo_component_kv_cache_events_applied KV cache event counter
 # TYPE dynamo_component_kv_cache_events_applied counter
