@@ -78,6 +78,7 @@ ATOM_METRICS = {
 }
 
 DYNAMO_METRICS = {
+    # --- Frontend request and latency metrics ---
     "dynamo_frontend_inflight_requests": "Inflight requests at the HTTP frontend",
     "dynamo_frontend_queued_requests": "Queued requests at the HTTP frontend",
     "dynamo_frontend_disconnected_clients": "Disconnected streaming clients",
@@ -87,6 +88,31 @@ DYNAMO_METRICS = {
     "dynamo_frontend_inter_token_latency_seconds": "Frontend inter-token latency (ITL)",
     "dynamo_frontend_request_duration_seconds": "Frontend end-to-end request latency",
     "dynamo_frontend_model_migration_total": "Total request migrations due to worker unavailability",
+    "dynamo_frontend_input_sequence_tokens": "Input sequence token count distribution (histogram)",
+    "dynamo_frontend_output_sequence_tokens": "Output sequence token count distribution (histogram)",
+    "dynamo_frontend_cached_tokens": "Tokens served from cache per request (histogram)",
+    # --- Frontend model-config gauges ---
+    "dynamo_frontend_model_total_kv_blocks": "Total KV blocks configured for the served model",
+    "dynamo_frontend_model_max_num_seqs": "Declared max concurrent sequences",
+    "dynamo_frontend_model_max_num_batched_tokens": "Declared batched token budget",
+    "dynamo_frontend_model_context_length": "Declared max context length",
+    "dynamo_frontend_model_kv_cache_block_size": "KV cache block size (tokens per block)",
+    "dynamo_frontend_model_migration_limit": "Per-request migration limit",
+    # --- Frontend router gauges ---
+    "dynamo_frontend_router_queue_pending_requests": "Router-side pending request queue depth",
+    # --- Per-worker gauges (labeled with worker_id, dp_rank, worker_type) ---
+    "dynamo_frontend_worker_active_decode_blocks": "Active decode KV blocks per worker",
+    "dynamo_frontend_worker_active_prefill_tokens": "Active prefill tokens per worker",
+    "dynamo_frontend_worker_last_time_to_first_token_seconds": "Last observed TTFT per worker",
+    "dynamo_frontend_worker_last_input_sequence_tokens": "Last observed input sequence tokens per worker",
+    "dynamo_frontend_worker_last_inter_token_latency_seconds": "Last observed ITL per worker",
+    # --- Router-overhead histograms (values are raw ms, not seconds) ---
+    "dynamo_router_overhead_block_hashing_ms": "Block hashing overhead inside the router",
+    "dynamo_router_overhead_indexer_find_matches_ms": "KV indexer match-finding overhead",
+    "dynamo_router_overhead_seq_hashing_ms": "Sequence hashing overhead",
+    "dynamo_router_overhead_scheduling_ms": "Router scheduling overhead",
+    "dynamo_router_overhead_total_ms": "Total routing overhead per request",
+    # --- Backend component metrics ---
     "dynamo_component_inflight_requests": "Requests currently processed by a backend component",
     "dynamo_component_request_duration_seconds": "Backend component request duration",
     "dynamo_component_requests_total": "Total requests processed by a backend component",
@@ -94,6 +120,15 @@ DYNAMO_METRICS = {
     "dynamo_component_kvstats_total_blocks": "Total KV blocks on the worker",
     "dynamo_component_kvstats_gpu_cache_usage_percent": "Worker GPU KV cache utilization",
     "dynamo_component_kvstats_gpu_prefix_cache_hit_rate": "Worker GPU prefix cache hit rate",
+    "dynamo_component_kv_cache_events_applied": "Count of KV cache events applied by the router",
+    # --- Backend component-router histograms (Dynamo mirrors router metrics ---
+    # --- on the component side for per-worker attribution)                 ---
+    "dynamo_component_router_requests_total": "Component-side router request counter",
+    "dynamo_component_router_kv_hit_rate": "Component-side router KV hit rate (0-1 histogram)",
+    "dynamo_component_router_time_to_first_token_seconds": "Component-side TTFT (histogram)",
+    "dynamo_component_router_inter_token_latency_seconds": "Component-side ITL (histogram)",
+    "dynamo_component_router_input_sequence_tokens": "Component-side input-token histogram",
+    "dynamo_component_router_output_sequence_tokens": "Component-side output-token histogram",
     # KVBM offload/onboard block counters. KVBM exposes these on a SEPARATE
     # endpoint (default port 6880 via DYN_KVBM_METRICS_PORT) and only when
     # launched with DYN_KVBM_METRICS=true. An operator must add that port

@@ -75,6 +75,33 @@ class NormalizedMetrics:
     lmcache_hit_rate: float = 0.0
     lmcache_retrieve_speed_tps: float = 0.0
 
+    # Router-side metrics (Dynamo frontend router layer). These separate
+    # "routing overhead" from "backend compute" — when TTFT is high, these
+    # tell you whether the router or the backend is responsible.
+    router_overhead_total_ms: float | None = None  # histogram avg, milliseconds
+    router_overhead_block_hashing_ms: float | None = None
+    router_overhead_indexer_ms: float | None = None  # dynamo_router_overhead_indexer_find_matches_ms
+    router_overhead_scheduling_ms: float | None = None
+    router_kv_hit_rate: float | None = None  # dynamo_component_router_kv_hit_rate (histogram 0-1)
+    router_queue_depth: float = 0.0  # dynamo_frontend_router_queue_pending_requests
+
+    # Cached-tokens-per-request histogram average. Direct measure of how
+    # many tokens were served from the prefix/KV cache on average. More
+    # reliable than hit_rate for coding workloads.
+    cached_tokens_avg: float | None = None
+
+    # KV cache event counter (applied events for the kv-aware router).
+    kv_cache_events_applied: float = 0.0
+
+    # Model-config gauges reported by the Dynamo frontend. Useful for
+    # validating that a live deployment's declared budget matches what
+    # the recommender suggested, and for audit-check context.
+    model_total_kv_blocks: float = 0.0
+    model_max_num_seqs: float = 0.0
+    model_max_num_batched_tokens: float = 0.0
+    model_context_length: float = 0.0
+    model_kv_cache_block_size: float = 0.0
+
     # Computed goodput metrics (derived from inferencebreakpoints/11-observability/metrics/goodput)
     # Goodput = useful output tokens/sec, excluding waste from preemptions, failures, and SLO violations
     goodput_tps: float = 0.0  # tokens/sec accounting for waste
@@ -131,6 +158,47 @@ class NormalizedMetrics:
             "lmcache": {
                 "hit_rate": self.lmcache_hit_rate,
                 "retrieve_speed_tps": self.lmcache_retrieve_speed_tps,
+            },
+            "router": {
+                "overhead_total_ms": (
+                    round(self.router_overhead_total_ms, 2)
+                    if self.router_overhead_total_ms is not None
+                    else None
+                ),
+                "overhead_block_hashing_ms": (
+                    round(self.router_overhead_block_hashing_ms, 2)
+                    if self.router_overhead_block_hashing_ms is not None
+                    else None
+                ),
+                "overhead_indexer_ms": (
+                    round(self.router_overhead_indexer_ms, 2)
+                    if self.router_overhead_indexer_ms is not None
+                    else None
+                ),
+                "overhead_scheduling_ms": (
+                    round(self.router_overhead_scheduling_ms, 2)
+                    if self.router_overhead_scheduling_ms is not None
+                    else None
+                ),
+                "kv_hit_rate": (
+                    round(self.router_kv_hit_rate, 4)
+                    if self.router_kv_hit_rate is not None
+                    else None
+                ),
+                "queue_depth": self.router_queue_depth,
+                "kv_cache_events_applied": self.kv_cache_events_applied,
+                "cached_tokens_avg": (
+                    round(self.cached_tokens_avg, 1)
+                    if self.cached_tokens_avg is not None
+                    else None
+                ),
+            },
+            "model_config": {
+                "total_kv_blocks": self.model_total_kv_blocks,
+                "max_num_seqs": self.model_max_num_seqs,
+                "max_num_batched_tokens": self.model_max_num_batched_tokens,
+                "context_length": self.model_context_length,
+                "kv_cache_block_size": self.model_kv_cache_block_size,
             },
             "goodput": {
                 "goodput_tps": round(self.goodput_tps, 1),
@@ -329,6 +397,41 @@ def normalize(scrape: ScrapeResult) -> NormalizedMetrics:
         lmc_speed_count = scrape.get("lmcache:retrieve_speed_count")
         if lmc_speed_count > 0:
             m.lmcache_retrieve_speed_tps = lmc_speed_sum / lmc_speed_count
+
+        # Router-overhead histograms (unit suffix is _ms; values are raw
+        # milliseconds, not seconds, per the Dynamo metric convention).
+        m.router_overhead_total_ms = scrape.get_histogram_avg("dynamo_router_overhead_total_ms")
+        m.router_overhead_block_hashing_ms = scrape.get_histogram_avg(
+            "dynamo_router_overhead_block_hashing_ms"
+        )
+        m.router_overhead_indexer_ms = scrape.get_histogram_avg(
+            "dynamo_router_overhead_indexer_find_matches_ms"
+        )
+        m.router_overhead_scheduling_ms = scrape.get_histogram_avg(
+            "dynamo_router_overhead_scheduling_ms"
+        )
+        # Router KV hit rate histogram — values are a 0-1 rate.
+        m.router_kv_hit_rate = scrape.get_histogram_avg(
+            "dynamo_component_router_kv_hit_rate"
+        )
+        m.router_queue_depth = scrape.get("dynamo_frontend_router_queue_pending_requests")
+
+        # Tokens-served-from-cache histogram average (per request).
+        m.cached_tokens_avg = scrape.get_histogram_avg("dynamo_frontend_cached_tokens")
+
+        # KV cache event counter.
+        m.kv_cache_events_applied = scrape.get("dynamo_component_kv_cache_events_applied")
+
+        # Model-config gauges reported by the frontend.
+        m.model_total_kv_blocks = scrape.get("dynamo_frontend_model_total_kv_blocks")
+        m.model_max_num_seqs = scrape.get("dynamo_frontend_model_max_num_seqs")
+        m.model_max_num_batched_tokens = scrape.get(
+            "dynamo_frontend_model_max_num_batched_tokens"
+        )
+        m.model_context_length = scrape.get("dynamo_frontend_model_context_length")
+        m.model_kv_cache_block_size = scrape.get(
+            "dynamo_frontend_model_kv_cache_block_size"
+        )
 
     # ── Compute derived metrics ────────────────────────────────────────
     _compute_goodput(m)
