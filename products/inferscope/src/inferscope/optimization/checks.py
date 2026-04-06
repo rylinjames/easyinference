@@ -861,6 +861,74 @@ def _check_router_overhead_dominates(m: NormalizedMetrics, ctx: DeploymentContex
     return None
 
 
+def _check_ttft_cpu_bound(m: NormalizedMetrics, ctx: DeploymentContext) -> AuditFinding | None:
+    """TTFT_CPU_BOUND — tokenizer latency is a large fraction of TTFT.
+
+    Completes the TTFT attribution chain. Given a TTFT value, the four
+    possible bottlenecks are:
+      * queue wait        -> caught by HIGH_TTFT, prefill_starvation logic
+      * router scheduling -> caught by ROUTER_OVERHEAD_DOMINATES
+      * prefill compute   -> implicit (remainder)
+      * CPU pre-processing (tokenization) -> caught by THIS check
+
+    `dynamo_frontend_tokenizer_latency_ms` is emitted by the HTTP
+    frontend and measures per-request tokenizer overhead in
+    milliseconds. When this number becomes a meaningful fraction of
+    TTFT, the fix is on the CPU side (faster tokenizer, prompt
+    canonicalization, process pinning), not the GPU side.
+
+    Fires when both:
+      (1) tokenizer latency is absolutely meaningful (> 30ms), and
+      (2) tokenizer latency is >= 20% of total TTFT.
+
+    No-fires when either metric is absent, when TTFT is zero, or
+    when the absolute tokenizer latency is small regardless of its
+    ratio — the latter case is "tokenizer is slow but overall TTFT
+    is also slow", where the tokenizer isn't the main problem.
+    """
+    if (
+        m.tokenizer_latency_ms is None
+        or m.ttft_avg_s is None
+        or m.ttft_avg_s <= 0
+    ):
+        return None
+    ttft_ms = m.ttft_avg_s * 1000
+    if m.tokenizer_latency_ms <= 30:
+        return None
+    ratio = m.tokenizer_latency_ms / ttft_ms
+    if ratio < 0.20:
+        return None
+    return AuditFinding(
+        check_id="TTFT_CPU_BOUND",
+        severity="warning",
+        title=(
+            f"Tokenizer is {ratio:.0%} of TTFT "
+            f"({m.tokenizer_latency_ms:.0f}ms of {ttft_ms:.0f}ms)"
+        ),
+        description=(
+            f"Tokenizer latency ({m.tokenizer_latency_ms:.0f}ms) is a "
+            f"significant fraction of total TTFT ({ttft_ms:.0f}ms). The "
+            "bottleneck is on the CPU pre-processing path, not the GPU "
+            "prefill path. Adding GPU capacity will not help — look at "
+            "tokenizer backend, prompt canonicalization, and preprocessor "
+            "worker count instead."
+        ),
+        current_value=(
+            f"tokenizer={m.tokenizer_latency_ms:.0f}ms, "
+            f"{ratio:.0%} of TTFT"
+        ),
+        recommended_value="<10% of TTFT and <20ms absolute",
+        fix_command=(
+            "Switch to a faster tokenizer backend (hf-tokenizers rust "
+            "tokenizer), normalize prompts to remove variable-length "
+            "whitespace, pin preprocessor workers, or increase the "
+            "frontend worker count"
+        ),
+        confidence=0.8,
+        evidence="metric_correlation",
+    )
+
+
 def _check_kvbm_tiering_ineffective(m: NormalizedMetrics, ctx: DeploymentContext) -> AuditFinding | None:
     """KVBM_TIERING_INEFFECTIVE — KVBM is configured but the host tier never hits.
 
@@ -960,5 +1028,6 @@ _ALL_CHECKS = [
     _check_lmcache_cold_start,
     _check_batch_itl_tradeoff,
     _check_router_overhead_dominates,
+    _check_ttft_cpu_bound,
     _check_kvbm_tiering_ineffective,
 ]

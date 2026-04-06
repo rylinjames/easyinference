@@ -48,6 +48,7 @@ from inferscope.optimization.checks import (
     _check_prefix_cache_disabled,
     _check_router_overhead_dominates,
     _check_speculative_overhead,
+    _check_ttft_cpu_bound,
     _check_wrong_attention_backend,
     run_all_checks,
 )
@@ -853,6 +854,47 @@ def test_router_overhead_dominates_silent_when_metric_missing() -> None:
 def test_router_overhead_dominates_silent_when_ttft_missing() -> None:
     m = _metrics(ttft_avg_s=None, router_overhead_total_ms=100.0)
     assert _check_router_overhead_dominates(m, _ctx()) is None
+
+
+# ============================================================================
+# TTFT_CPU_BOUND check (consumes dynamo_frontend_tokenizer_latency_ms)
+# ============================================================================
+
+
+def test_ttft_cpu_bound_fires_when_tokenizer_is_large_fraction() -> None:
+    # TTFT 200ms, tokenizer 80ms -> 40% -> fires
+    m = _metrics(ttft_avg_s=0.2, tokenizer_latency_ms=80.0)
+    finding = _check_ttft_cpu_bound(m, _ctx())
+    assert finding is not None
+    assert "40%" in finding.title
+
+
+def test_ttft_cpu_bound_silent_when_tokenizer_small_absolute() -> None:
+    # TTFT 100ms, tokenizer 10ms (10% ratio, but absolute is small) -> no fire
+    m = _metrics(ttft_avg_s=0.1, tokenizer_latency_ms=10.0)
+    assert _check_ttft_cpu_bound(m, _ctx()) is None
+
+
+def test_ttft_cpu_bound_silent_when_ratio_healthy() -> None:
+    # TTFT 2000ms, tokenizer 50ms -> 2.5% -> healthy
+    m = _metrics(ttft_avg_s=2.0, tokenizer_latency_ms=50.0)
+    assert _check_ttft_cpu_bound(m, _ctx()) is None
+
+
+def test_ttft_cpu_bound_silent_when_tokenizer_missing() -> None:
+    m = _metrics(ttft_avg_s=0.2, tokenizer_latency_ms=None)
+    assert _check_ttft_cpu_bound(m, _ctx()) is None
+
+
+def test_ttft_cpu_bound_silent_when_ttft_missing() -> None:
+    m = _metrics(ttft_avg_s=None, tokenizer_latency_ms=80.0)
+    assert _check_ttft_cpu_bound(m, _ctx()) is None
+
+
+def test_ttft_cpu_bound_silent_at_threshold_boundary() -> None:
+    # Exactly 30ms absolute (boundary) — check uses strict >, so silent
+    m = _metrics(ttft_avg_s=0.1, tokenizer_latency_ms=30.0)
+    assert _check_ttft_cpu_bound(m, _ctx()) is None
 
 
 # ============================================================================
