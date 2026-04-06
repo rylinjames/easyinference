@@ -2,9 +2,25 @@
 # long-context coding deployment on Kimi-K2.5 at ~50% GPU KV cache
 # utilization with a warm LMCache and fast router stages.
 #
-# Metric names are taken from the authoritative Dynamo source:
-#   github.com/ai-dynamo/dynamo/blob/main/docs/observability/metrics.md
-#   lib/runtime/src/metrics/prometheus_names.rs
+# Metric names are taken from the authoritative Dynamo sources, all
+# cross-checked against the Rust emission sites:
+#   lib/llm/src/http/service/metrics.rs    (HTTP frontend metrics)
+#   lib/llm/src/kv_router/metrics.rs       (KV router + router-overhead)
+#   lib/runtime/src/metrics/prometheus_names.rs  (constant names)
+#   docs/observability/metrics.md
+#   deploy/observability/grafana_dashboards/*.json
+#
+# This fixture covers EVERY metric name currently in
+# inferscope.telemetry.prometheus.DYNAMO_METRICS that can appear on a
+# single Dynamo frontend + backend scrape. Metrics on SEPARATE endpoints
+# (KVBM on :6880, NIXL on :19090) are intentionally excluded — they
+# need their own fixture files in future.
+#
+# The test_fixture_covers_all_dynamo_metrics test enforces that every
+# eligible metric name appears in the parsed scrape, so a future
+# schema rename in Dynamo that InferScope hasn't updated to will fail
+# at this fixture first rather than silently disappearing from audit
+# findings.
 #
 # Histogram metrics supply _sum and _count so that ScrapeResult.get_histogram_avg
 # can derive the average without needing bucket-level parsing.
@@ -39,6 +55,10 @@ dynamo_frontend_output_tokens_total{model="Kimi-K2.5"} 4500000
 # TYPE dynamo_frontend_model_migration_total counter
 dynamo_frontend_model_migration_total{model="Kimi-K2.5",migration_type="worker_drain"} 3
 
+# HELP dynamo_frontend_model_cancellation_total Total client cancellations
+# TYPE dynamo_frontend_model_cancellation_total counter
+dynamo_frontend_model_cancellation_total{model="Kimi-K2.5"} 15
+
 # HELP dynamo_frontend_time_to_first_token_seconds Frontend TTFT histogram
 # TYPE dynamo_frontend_time_to_first_token_seconds histogram
 dynamo_frontend_time_to_first_token_seconds_sum{model="Kimi-K2.5"} 3200
@@ -58,6 +78,21 @@ dynamo_frontend_request_duration_seconds_count{model="Kimi-K2.5"} 10000
 # TYPE dynamo_frontend_cached_tokens histogram
 dynamo_frontend_cached_tokens_sum{model="Kimi-K2.5"} 30000000
 dynamo_frontend_cached_tokens_count{model="Kimi-K2.5"} 10000
+
+# HELP dynamo_frontend_input_sequence_tokens Input sequence tokens per request
+# TYPE dynamo_frontend_input_sequence_tokens histogram
+dynamo_frontend_input_sequence_tokens_sum{model="Kimi-K2.5"} 20000000
+dynamo_frontend_input_sequence_tokens_count{model="Kimi-K2.5"} 10000
+
+# HELP dynamo_frontend_output_sequence_tokens Output sequence tokens per request
+# TYPE dynamo_frontend_output_sequence_tokens histogram
+dynamo_frontend_output_sequence_tokens_sum{model="Kimi-K2.5"} 4500000
+dynamo_frontend_output_sequence_tokens_count{model="Kimi-K2.5"} 10000
+
+# HELP dynamo_frontend_tokenizer_latency_ms Per-request tokenizer latency (ms)
+# TYPE dynamo_frontend_tokenizer_latency_ms histogram
+dynamo_frontend_tokenizer_latency_ms_sum{model="Kimi-K2.5"} 50000
+dynamo_frontend_tokenizer_latency_ms_count{model="Kimi-K2.5"} 10000
 
 # HELP dynamo_frontend_router_queue_pending_requests Router-side pending queue
 # TYPE dynamo_frontend_router_queue_pending_requests gauge
@@ -83,6 +118,39 @@ dynamo_frontend_model_context_length{model="Kimi-K2.5"} 131072
 # TYPE dynamo_frontend_model_kv_cache_block_size gauge
 dynamo_frontend_model_kv_cache_block_size{model="Kimi-K2.5"} 16
 
+# HELP dynamo_frontend_model_migration_limit Per-request migration limit
+# TYPE dynamo_frontend_model_migration_limit gauge
+dynamo_frontend_model_migration_limit{model="Kimi-K2.5"} 2
+
+# --- Per-worker last-value gauges (labeled by worker_id, dp_rank, worker_type) ---
+# Two decode workers active. Labels mirror the real Dynamo emission site
+# in lib/llm/src/kv_router/metrics.rs.
+
+# HELP dynamo_frontend_worker_active_decode_blocks Active decode KV blocks per worker
+# TYPE dynamo_frontend_worker_active_decode_blocks gauge
+dynamo_frontend_worker_active_decode_blocks{worker_id="w0",dp_rank="0",worker_type="decode"} 180
+dynamo_frontend_worker_active_decode_blocks{worker_id="w1",dp_rank="0",worker_type="decode"} 210
+
+# HELP dynamo_frontend_worker_active_prefill_tokens Active prefill tokens per worker
+# TYPE dynamo_frontend_worker_active_prefill_tokens gauge
+dynamo_frontend_worker_active_prefill_tokens{worker_id="w0",dp_rank="0",worker_type="prefill"} 4096
+dynamo_frontend_worker_active_prefill_tokens{worker_id="w1",dp_rank="0",worker_type="prefill"} 3072
+
+# HELP dynamo_frontend_worker_last_time_to_first_token_seconds Last TTFT per worker
+# TYPE dynamo_frontend_worker_last_time_to_first_token_seconds gauge
+dynamo_frontend_worker_last_time_to_first_token_seconds{worker_id="w0",dp_rank="0",worker_type="decode"} 0.28
+dynamo_frontend_worker_last_time_to_first_token_seconds{worker_id="w1",dp_rank="0",worker_type="decode"} 0.31
+
+# HELP dynamo_frontend_worker_last_input_sequence_tokens Last input tokens per worker
+# TYPE dynamo_frontend_worker_last_input_sequence_tokens gauge
+dynamo_frontend_worker_last_input_sequence_tokens{worker_id="w0",dp_rank="0",worker_type="decode"} 2040
+dynamo_frontend_worker_last_input_sequence_tokens{worker_id="w1",dp_rank="0",worker_type="decode"} 1960
+
+# HELP dynamo_frontend_worker_last_inter_token_latency_seconds Last ITL per worker
+# TYPE dynamo_frontend_worker_last_inter_token_latency_seconds gauge
+dynamo_frontend_worker_last_inter_token_latency_seconds{worker_id="w0",dp_rank="0",worker_type="decode"} 0.019
+dynamo_frontend_worker_last_inter_token_latency_seconds{worker_id="w1",dp_rank="0",worker_type="decode"} 0.021
+
 # HELP dynamo_component_inflight_requests Inflight requests at backend
 # TYPE dynamo_component_inflight_requests gauge
 dynamo_component_inflight_requests{dynamo_namespace="default",dynamo_component="worker",dynamo_endpoint="generate"} 12
@@ -90,6 +158,27 @@ dynamo_component_inflight_requests{dynamo_namespace="default",dynamo_component="
 # HELP dynamo_component_requests_total Total backend requests
 # TYPE dynamo_component_requests_total counter
 dynamo_component_requests_total{dynamo_namespace="default",dynamo_component="worker",dynamo_endpoint="generate"} 10000
+
+# HELP dynamo_component_request_duration_seconds Backend request duration histogram
+# TYPE dynamo_component_request_duration_seconds histogram
+dynamo_component_request_duration_seconds_sum{dynamo_namespace="default",dynamo_component="worker",dynamo_endpoint="generate"} 11500
+dynamo_component_request_duration_seconds_count{dynamo_namespace="default",dynamo_component="worker",dynamo_endpoint="generate"} 10000
+
+# HELP dynamo_component_request_bytes_total Total request payload bytes
+# TYPE dynamo_component_request_bytes_total counter
+dynamo_component_request_bytes_total{dynamo_namespace="default",dynamo_component="worker",dynamo_endpoint="generate"} 41943040
+
+# HELP dynamo_component_response_bytes_total Total response payload bytes
+# TYPE dynamo_component_response_bytes_total counter
+dynamo_component_response_bytes_total{dynamo_namespace="default",dynamo_component="worker",dynamo_endpoint="generate"} 104857600
+
+# HELP dynamo_component_uptime_seconds Component uptime
+# TYPE dynamo_component_uptime_seconds gauge
+dynamo_component_uptime_seconds{dynamo_namespace="default",dynamo_component="worker",dynamo_endpoint="generate"} 3600
+
+# HELP dynamo_component_kv_publisher_engines_dropped_events_total Dropped KV publisher events
+# TYPE dynamo_component_kv_publisher_engines_dropped_events_total counter
+dynamo_component_kv_publisher_engines_dropped_events_total{dynamo_namespace="default",dynamo_component="worker"} 0
 
 # HELP dynamo_component_active_blocks Active KV blocks
 # TYPE dynamo_component_active_blocks gauge
@@ -135,10 +224,42 @@ dynamo_router_overhead_indexer_find_matches_ms_count{router_id="r0"} 10000
 dynamo_router_overhead_scheduling_ms_sum{router_id="r0"} 10000
 dynamo_router_overhead_scheduling_ms_count{router_id="r0"} 10000
 
+# HELP dynamo_router_overhead_seq_hashing_ms Sequence hashing overhead
+# TYPE dynamo_router_overhead_seq_hashing_ms histogram
+dynamo_router_overhead_seq_hashing_ms_sum{router_id="r0"} 5000
+dynamo_router_overhead_seq_hashing_ms_count{router_id="r0"} 10000
+
+# --- Component-side router histograms (mirrors frontend latency at the ---
+# --- backend for per-worker attribution)                                ---
+
+# HELP dynamo_component_router_requests_total Component-side router request counter
+# TYPE dynamo_component_router_requests_total counter
+dynamo_component_router_requests_total{dynamo_component="router"} 10000
+
 # HELP dynamo_component_router_kv_hit_rate Router KV hit rate
 # TYPE dynamo_component_router_kv_hit_rate histogram
 dynamo_component_router_kv_hit_rate_sum{dynamo_component="router"} 7100
 dynamo_component_router_kv_hit_rate_count{dynamo_component="router"} 10000
+
+# HELP dynamo_component_router_time_to_first_token_seconds Component-side TTFT
+# TYPE dynamo_component_router_time_to_first_token_seconds histogram
+dynamo_component_router_time_to_first_token_seconds_sum{dynamo_component="router"} 3150
+dynamo_component_router_time_to_first_token_seconds_count{dynamo_component="router"} 10000
+
+# HELP dynamo_component_router_inter_token_latency_seconds Component-side ITL
+# TYPE dynamo_component_router_inter_token_latency_seconds histogram
+dynamo_component_router_inter_token_latency_seconds_sum{dynamo_component="router"} 195
+dynamo_component_router_inter_token_latency_seconds_count{dynamo_component="router"} 10000
+
+# HELP dynamo_component_router_input_sequence_tokens Component-side input tokens histogram
+# TYPE dynamo_component_router_input_sequence_tokens histogram
+dynamo_component_router_input_sequence_tokens_sum{dynamo_component="router"} 20000000
+dynamo_component_router_input_sequence_tokens_count{dynamo_component="router"} 10000
+
+# HELP dynamo_component_router_output_sequence_tokens Component-side output tokens histogram
+# TYPE dynamo_component_router_output_sequence_tokens histogram
+dynamo_component_router_output_sequence_tokens_sum{dynamo_component="router"} 4500000
+dynamo_component_router_output_sequence_tokens_count{dynamo_component="router"} 10000
 
 # HELP lmcache:num_hit_tokens_total Tokens found in LMCache
 # TYPE lmcache:num_hit_tokens_total counter

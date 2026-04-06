@@ -39,6 +39,7 @@ from pathlib import Path
 from inferscope.optimization.checks import DeploymentContext, run_all_checks
 from inferscope.telemetry.normalizer import normalize
 from inferscope.telemetry.prometheus import (
+    DYNAMO_METRICS,
     ScrapeResult,
     detect_engine_from_metrics,
     parse_prometheus_text,
@@ -109,6 +110,50 @@ def _healthy_ctx() -> DeploymentContext:
 def test_fixture_detects_dynamo_engine() -> None:
     scrape = _load_healthy_fixture()
     assert scrape.engine == "dynamo"
+
+
+#: Metric names in DYNAMO_METRICS that are NOT emitted on the main
+#: Dynamo frontend + backend endpoints and therefore shouldn't appear
+#: in a frontend-scrape fixture.
+#:
+#: KVBM metrics live on port 6880 (DYN_KVBM_METRICS_PORT) when the user
+#: launches Dynamo with DYN_KVBM_METRICS=true. They deserve their own
+#: fixture file once someone captures a real KVBM scrape.
+_SEPARATE_ENDPOINT_METRIC_PREFIXES = ("kvbm_",)
+
+
+def test_fixture_covers_all_dynamo_metrics() -> None:
+    """Schema-drift canary.
+
+    For every metric name in DYNAMO_METRICS that can appear on the
+    main frontend/backend Dynamo scrape, assert that the parsed fixture
+    contains either the bare metric name (for gauges/counters) OR the
+    `_sum` / `_count` pair (for histograms). If a future refactor adds
+    a new metric to DYNAMO_METRICS and forgets to update the fixture,
+    this test fails on the first CI run.
+
+    Works the other direction too: if a metric is removed from
+    DYNAMO_METRICS, this test still passes because it doesn't care
+    about the fixture having extra metrics — that case is covered
+    naturally by parse-all-expected-families.
+    """
+    scrape = _load_healthy_fixture()
+    raw = scrape.raw_metrics
+    missing: list[str] = []
+    for name in DYNAMO_METRICS:
+        if name.startswith(_SEPARATE_ENDPOINT_METRIC_PREFIXES):
+            continue
+        bare_present = name in raw
+        histogram_present = (f"{name}_sum" in raw) and (f"{name}_count" in raw)
+        if not (bare_present or histogram_present):
+            missing.append(name)
+    assert not missing, (
+        "Fixture is missing these metrics from DYNAMO_METRICS. Either "
+        "add them to dynamo_metrics_healthy.txt with realistic healthy "
+        "values or (if they belong on a separate endpoint like KVBM or "
+        "NIXL) add the prefix to _SEPARATE_ENDPOINT_METRIC_PREFIXES. "
+        f"Missing: {sorted(missing)}"
+    )
 
 
 def test_fixture_parses_all_expected_metric_families() -> None:
