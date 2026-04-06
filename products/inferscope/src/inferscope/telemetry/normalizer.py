@@ -49,6 +49,11 @@ class NormalizedMetrics:
 
     # Dynamo reliability/observability signals
     request_migrations_total: float = 0.0
+    request_cancellations_total: float = 0.0  # dynamo_frontend_model_cancellation_total
+    kv_publisher_dropped_events_total: float = 0.0  # stale router cache signal
+    request_bytes_total: float = 0.0  # dynamo_component_request_bytes_total
+    response_bytes_total: float = 0.0  # dynamo_component_response_bytes_total
+    component_uptime_seconds: float = 0.0
     disconnected_clients: float = 0.0
     kv_active_blocks: float = 0.0
     kv_total_blocks: float = 0.0
@@ -140,10 +145,15 @@ class NormalizedMetrics:
             },
             "reliability": {
                 "request_migrations_total": self.request_migrations_total,
+                "request_cancellations_total": self.request_cancellations_total,
+                "kv_publisher_dropped_events_total": self.kv_publisher_dropped_events_total,
                 "disconnected_clients": self.disconnected_clients,
                 "kv_active_blocks": self.kv_active_blocks,
                 "kv_total_blocks": self.kv_total_blocks,
                 "errors_total": self.errors_total,
+                "component_uptime_seconds": self.component_uptime_seconds,
+                "request_bytes_total": self.request_bytes_total,
+                "response_bytes_total": self.response_bytes_total,
             },
             "disaggregation": {
                 "kvbm_offload_d2h": self.kvbm_offload_d2h,
@@ -364,6 +374,13 @@ def normalize(scrape: ScrapeResult) -> NormalizedMetrics:
             "dynamo_component_request_duration_seconds"
         )
         m.request_migrations_total = scrape.get("dynamo_frontend_model_migration_total")
+        m.request_cancellations_total = scrape.get("dynamo_frontend_model_cancellation_total")
+        m.kv_publisher_dropped_events_total = scrape.get(
+            "dynamo_component_kv_publisher_engines_dropped_events_total"
+        )
+        m.request_bytes_total = scrape.get("dynamo_component_request_bytes_total")
+        m.response_bytes_total = scrape.get("dynamo_component_response_bytes_total")
+        m.component_uptime_seconds = scrape.get("dynamo_component_uptime_seconds")
         m.disconnected_clients = scrape.get("dynamo_frontend_disconnected_clients")
         m.kv_active_blocks = scrape.get("dynamo_component_active_blocks")
         m.kv_total_blocks = scrape.get("dynamo_component_total_blocks")

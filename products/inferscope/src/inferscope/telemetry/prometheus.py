@@ -88,6 +88,7 @@ DYNAMO_METRICS = {
     "dynamo_frontend_inter_token_latency_seconds": "Frontend inter-token latency (ITL)",
     "dynamo_frontend_request_duration_seconds": "Frontend end-to-end request latency",
     "dynamo_frontend_model_migration_total": "Total request migrations due to worker unavailability",
+    "dynamo_frontend_model_cancellation_total": "Total requests cancelled by the client",
     "dynamo_frontend_input_sequence_tokens": "Input sequence token count distribution (histogram)",
     "dynamo_frontend_output_sequence_tokens": "Output sequence token count distribution (histogram)",
     "dynamo_frontend_cached_tokens": "Tokens served from cache per request (histogram)",
@@ -107,6 +108,15 @@ DYNAMO_METRICS = {
     "dynamo_frontend_worker_last_input_sequence_tokens": "Last observed input sequence tokens per worker",
     "dynamo_frontend_worker_last_inter_token_latency_seconds": "Last observed ITL per worker",
     # --- Router-overhead histograms (values are raw ms, not seconds) ---
+    # Naming ambiguity: docs/observability/metrics.md spells these as
+    # `dynamo_router_overhead_*` but lib/runtime/src/metrics/prometheus_names.rs
+    # declares `ROUTING_OVERHEAD = "dynamo_routing_overhead"` as the namespace
+    # (note: `routing` not `router`). The two spellings disagree inside the
+    # Dynamo repo itself. We follow metrics.md because it's what the docs
+    # tell operators to expect and matches the dynamo.json dashboard naming
+    # convention for other metrics. If a real captured scrape shows
+    # `dynamo_routing_overhead_*` instead, add the alt names as fallbacks
+    # in normalizer.py and update here.
     "dynamo_router_overhead_block_hashing_ms": "Block hashing overhead inside the router",
     "dynamo_router_overhead_indexer_find_matches_ms": "KV indexer match-finding overhead",
     "dynamo_router_overhead_seq_hashing_ms": "Sequence hashing overhead",
@@ -116,6 +126,11 @@ DYNAMO_METRICS = {
     "dynamo_component_inflight_requests": "Requests currently processed by a backend component",
     "dynamo_component_request_duration_seconds": "Backend component request duration",
     "dynamo_component_requests_total": "Total requests processed by a backend component",
+    "dynamo_component_request_bytes_total": "Total request payload bytes",
+    "dynamo_component_response_bytes_total": "Total response payload bytes",
+    "dynamo_component_uptime_seconds": "Component uptime in seconds",
+    "dynamo_component_kv_publisher_engines_dropped_events_total":
+        "KV publisher dropped events — indicates the router's cache view is stale",
     # KV-stats metrics emitted by the worker/router. Note: there is NO
     # `kvstats` segment in the real metric names. The bare constants in
     # the Dynamo source (lib/runtime/src/metrics/prometheus_names.rs)
@@ -152,16 +167,23 @@ DYNAMO_METRICS = {
     "kvbm_disk_cache_hit_rate": "Disk tier KV cache hit rate",
     "kvbm_object_cache_hit_rate": "Object storage tier KV cache hit rate",
     "kvbm_matched_tokens": "Tokens reused from KVBM cache",
-    # NIXL transfer metrics — exposed on a SEPARATE endpoint via
-    # NIXL_TELEMETRY_PROMETHEUS_PORT. The exact metric names are not
-    # documented in the current Dynamo repo (NIXL is its own upstream
-    # project). The names below are provisional, left in place so the
-    # dormant NIXL_TRANSFER_DOMINATES check becomes live as soon as a
-    # real NIXL scrape target is wired in and the real names confirmed.
-    "dynamo_nixl_transfer_latency_seconds": "NIXL KV transfer latency (provisional name)",
-    "dynamo_nixl_transfer_bytes_total": "Total bytes transferred via NIXL (provisional name)",
-    "dynamo_nixl_transfer_failures_total": "Failed NIXL transfer attempts (provisional name)",
 }
+
+# NIXL TRANSFER METRICS — UNVERIFIED, NOT IN DYNAMO_METRICS.
+# NIXL is exposed on a SEPARATE Prometheus endpoint (port 19090 per
+# Dynamo's own deploy/observability/prometheus.yml scrape config) and
+# is emitted by the NIXL upstream library, NOT by Dynamo runtime. The
+# metric name schema is not in lib/runtime/src/metrics/prometheus_names.rs
+# anywhere — searching the Dynamo repo for `dynamo_nixl_` returns zero
+# results — so the earlier `dynamo_nixl_transfer_*` names this module
+# carried were invented, not sourced.
+# The NIXL_TRANSFER_DOMINATES audit check stays in the registry as
+# DORMANT: it reads the `nixl_transfer_*` fields on NormalizedMetrics,
+# which will only populate if an operator wires a NIXL scrape target
+# whose metric names we eventually add here. Adding those names requires
+# capturing a real NIXL /metrics scrape from a disaggregated Dynamo
+# deployment and recording the actual exposition format. Until that
+# happens, the dormant-by-data-absence path is the honest state.
 
 LMCACHE_METRICS: dict[str, str] = {
     "lmcache:num_hit_tokens_total": "Total tokens found in LMCache",
