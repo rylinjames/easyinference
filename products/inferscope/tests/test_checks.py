@@ -35,6 +35,7 @@ from inferscope.optimization.checks import (
     _check_kv_dtype_suboptimal,
     _check_kv_fragmentation_high,
     _check_kv_preemption_storm,
+    _check_kvbm_tiering_ineffective,
     _check_lmcache_cold_start,
     _check_low_prefix_hit_coding,
     _check_memory_util_low,
@@ -45,6 +46,7 @@ from inferscope.optimization.checks import (
     _check_pcie_offload_thrash,
     _check_prefill_starvation,
     _check_prefix_cache_disabled,
+    _check_router_overhead_dominates,
     _check_speculative_overhead,
     _check_wrong_attention_backend,
     run_all_checks,
@@ -815,6 +817,86 @@ def test_prefill_starvation_silent_when_both_high() -> None:
 def test_prefill_starvation_silent_when_itl_unset() -> None:
     m = _metrics(ttft_avg_s=8.0, itl_avg_s=None)
     assert _check_prefill_starvation(m, _ctx()) is None
+
+
+# ============================================================================
+# Router-overhead check (new — consumes dynamo_router_overhead_total_ms)
+# ============================================================================
+
+
+def test_router_overhead_dominates_fires_when_overhead_is_large_fraction() -> None:
+    # TTFT = 200ms total, of which 100ms (50%) is router overhead → fires
+    m = _metrics(ttft_avg_s=0.2, router_overhead_total_ms=100.0)
+    finding = _check_router_overhead_dominates(m, _ctx())
+    assert finding is not None
+    assert "50%" in finding.title
+
+
+def test_router_overhead_dominates_silent_when_overhead_is_small() -> None:
+    # TTFT = 200ms, only 10ms router overhead → not fire (below 50ms floor)
+    m = _metrics(ttft_avg_s=0.2, router_overhead_total_ms=10.0)
+    assert _check_router_overhead_dominates(m, _ctx()) is None
+
+
+def test_router_overhead_dominates_silent_when_ratio_healthy() -> None:
+    # TTFT = 2000ms, router overhead 60ms → 3% of TTFT, clearly not dominating
+    m = _metrics(ttft_avg_s=2.0, router_overhead_total_ms=60.0)
+    assert _check_router_overhead_dominates(m, _ctx()) is None
+
+
+def test_router_overhead_dominates_silent_when_metric_missing() -> None:
+    # No data — check must no-fire cleanly, not crash
+    m = _metrics(ttft_avg_s=0.2, router_overhead_total_ms=None)
+    assert _check_router_overhead_dominates(m, _ctx()) is None
+
+
+def test_router_overhead_dominates_silent_when_ttft_missing() -> None:
+    m = _metrics(ttft_avg_s=None, router_overhead_total_ms=100.0)
+    assert _check_router_overhead_dominates(m, _ctx()) is None
+
+
+# ============================================================================
+# KVBM_TIERING_INEFFECTIVE check (replaces deleted GROVE_TIER_IMBALANCE)
+# ============================================================================
+
+
+def test_kvbm_tiering_ineffective_fires_when_host_hit_rate_is_zero_under_pressure() -> None:
+    # KVBM is active (offloads happening), GPU is hot, but host tier hits are 0
+    m = _metrics(
+        kv_cache_usage=0.92,
+        kvbm_offload_d2h=500.0,
+        kvbm_onboard_h2d=100.0,
+        kvbm_host_hit_rate=0.02,
+    )
+    assert _check_kvbm_tiering_ineffective(m, _ctx()) is not None
+
+
+def test_kvbm_tiering_ineffective_silent_when_kvbm_not_active() -> None:
+    # Without any KVBM signal, the check must no-fire — KVBM is on a
+    # separate scrape endpoint and absence of data means "not enabled",
+    # not "broken".
+    m = _metrics(kv_cache_usage=0.92)
+    assert _check_kvbm_tiering_ineffective(m, _ctx()) is None
+
+
+def test_kvbm_tiering_ineffective_silent_when_host_hit_rate_healthy() -> None:
+    m = _metrics(
+        kv_cache_usage=0.92,
+        kvbm_offload_d2h=500.0,
+        kvbm_onboard_h2d=200.0,
+        kvbm_host_hit_rate=0.35,  # tiering is working — 35% of demoted blocks re-used
+    )
+    assert _check_kvbm_tiering_ineffective(m, _ctx()) is None
+
+
+def test_kvbm_tiering_ineffective_silent_when_gpu_not_under_pressure() -> None:
+    # GPU has headroom — no reason to complain about low host tier hits
+    m = _metrics(
+        kv_cache_usage=0.50,
+        kvbm_offload_d2h=100.0,
+        kvbm_host_hit_rate=0.02,
+    )
+    assert _check_kvbm_tiering_ineffective(m, _ctx()) is None
 
 
 # ----------------------------------------------------------------------------

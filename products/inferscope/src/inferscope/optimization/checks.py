@@ -697,6 +697,17 @@ def _check_nixl_transfer_dominates(m: NormalizedMetrics, ctx: DeploymentContext)
     Grounded in inferencebreakpoints/07-kv-cache/disaggregated-kv/cache-hit-vs-recompute-decision:
     In disaggregated systems, the router must decide transfer vs recompute. When NIXL transfer
     latency is high relative to context length, recompute may be cheaper.
+
+    DORMANT BY DEFAULT. NIXL exposes its own Prometheus endpoint via
+    NIXL_TELEMETRY_PROMETHEUS_PORT, separate from the Dynamo frontend
+    /metrics endpoint. The real NIXL metric schema is not documented in
+    the current Dynamo repo. This check will only fire when:
+      (1) the operator adds the NIXL endpoint as an extra metrics_target,
+      (2) the schema pinned in telemetry/prometheus.py matches the real
+          NIXL metric names — which needs verification against a captured
+          scrape from a real disaggregated deployment.
+    Until (2) is done, nixl_transfer_latency_s stays None and this check
+    no-fires cleanly.
     """
     if (
         ctx.split_prefill_decode
@@ -795,6 +806,124 @@ def _check_batch_itl_tradeoff(m: NormalizedMetrics, ctx: DeploymentContext) -> A
     return None
 
 
+def _check_router_overhead_dominates(m: NormalizedMetrics, ctx: DeploymentContext) -> AuditFinding | None:
+    """ROUTER_OVERHEAD_DOMINATES — Dynamo routing overhead is a large fraction of TTFT.
+
+    The Dynamo frontend publishes per-request routing overhead histograms
+    (`dynamo_router_overhead_*_ms`) separate from backend compute time.
+    When the router's scheduling, block hashing, or KV indexer overhead
+    becomes comparable to the backend prefill time, TTFT is limited by
+    the router rather than by compute — the fix is usually router
+    tuning, not adding GPU capacity.
+
+    Fires only when router overhead metrics are present in the scrape
+    (Dynamo may not emit them in all versions), so this check is a
+    no-op for non-Dynamo or older Dynamo deployments.
+    """
+    if m.router_overhead_total_ms is None or m.ttft_avg_s is None or m.ttft_avg_s <= 0:
+        return None
+    ttft_ms = m.ttft_avg_s * 1000
+    # Meaningful-absolute-overhead guard (50ms) plus a ratio test (>30%
+    # of TTFT). Either alone would false-positive on very fast or very
+    # slow deployments; together they target the "routing dominates"
+    # regime specifically.
+    if m.router_overhead_total_ms > 50 and m.router_overhead_total_ms / ttft_ms > 0.30:
+        overhead_ratio = m.router_overhead_total_ms / ttft_ms
+        return AuditFinding(
+            check_id="ROUTER_OVERHEAD_DOMINATES",
+            severity="warning",
+            title=(
+                f"Router overhead is {overhead_ratio:.0%} of TTFT "
+                f"({m.router_overhead_total_ms:.0f}ms of {ttft_ms:.0f}ms)"
+            ),
+            description=(
+                f"Dynamo router overhead ({m.router_overhead_total_ms:.0f}ms) is a large "
+                f"fraction of total time-to-first-token ({ttft_ms:.0f}ms). "
+                "Investigate the per-stage breakdown "
+                f"(block_hashing={m.router_overhead_block_hashing_ms or 0:.0f}ms, "
+                f"indexer={m.router_overhead_indexer_ms or 0:.0f}ms, "
+                f"scheduling={m.router_overhead_scheduling_ms or 0:.0f}ms). "
+                "Adding GPU capacity will not help if routing is the bottleneck."
+            ),
+            current_value=(
+                f"total={m.router_overhead_total_ms:.0f}ms, "
+                f"{overhead_ratio:.0%} of TTFT"
+            ),
+            recommended_value="<10% of TTFT and <30ms total",
+            fix_command=(
+                "Tune router worker count, reduce KV indexer block-hash depth, "
+                "or move to a simpler routing policy if the workload doesn't "
+                "benefit from KV-aware routing"
+            ),
+            confidence=0.8,
+            evidence="metric_correlation",
+        )
+    return None
+
+
+def _check_kvbm_tiering_ineffective(m: NormalizedMetrics, ctx: DeploymentContext) -> AuditFinding | None:
+    """KVBM_TIERING_INEFFECTIVE — KVBM is configured but the host tier never hits.
+
+    When KVBM (KV Block Manager) is enabled, it tiers KV cache across
+    GPU HBM -> CPU DRAM -> NVMe -> object storage. An effective tiering
+    policy should produce meaningful hit rates on the CPU (host) tier
+    for bursty or long-tail workloads — tokens that couldn't fit on the
+    GPU are demoted to host memory and then re-onboarded when needed.
+
+    This check fires when:
+      (1) GPU KV cache is hot (usage > 85%),
+      (2) KVBM is active (any offload or onboard counter is nonzero —
+          this is the "KVBM is configured" gate),
+      (3) the host tier hit rate is near-zero (<5%).
+    That combination means blocks are being demoted but not re-used —
+    the working set exceeds tier capacity, or the demotion policy is
+    evicting blocks faster than they would be re-requested.
+
+    Silently no-fires when KVBM is not enabled, because the KVBM
+    metrics only populate when the operator scrapes the separate KVBM
+    /metrics endpoint (default port 6880 via DYN_KVBM_METRICS_PORT,
+    behind DYN_KVBM_METRICS=true).
+
+    This replaces the deleted GROVE_TIER_IMBALANCE check, which was
+    based on a conceptual confusion (Grove is Dynamo's Kubernetes
+    scheduler, not a KV tiering system).
+    """
+    kvbm_active = (
+        m.kvbm_offload_d2h > 0
+        or m.kvbm_onboard_h2d > 0
+        or m.kvbm_host_hit_rate > 0
+    )
+    if not kvbm_active:
+        return None
+    if m.kv_cache_usage > 0.85 and m.kvbm_host_hit_rate < 0.05:
+        return AuditFinding(
+            check_id="KVBM_TIERING_INEFFECTIVE",
+            severity="warning",
+            title="KVBM tiering enabled but host tier hit rate is near zero",
+            description=(
+                f"KVBM is active ({m.kvbm_offload_d2h:.0f} offloads, "
+                f"{m.kvbm_onboard_h2d:.0f} onboards) and the GPU KV cache is hot at "
+                f"{m.kv_cache_usage:.0%}, but the CPU (host) tier hit rate is "
+                f"only {m.kvbm_host_hit_rate:.1%}. Blocks are being demoted to "
+                "host memory but not re-used — either the working set exceeds "
+                "tier capacity or the demotion policy is evicting blocks faster "
+                "than they would be re-requested."
+            ),
+            current_value=(
+                f"GPU {m.kv_cache_usage:.0%}, host hit rate {m.kvbm_host_hit_rate:.1%}"
+            ),
+            recommended_value="Host tier hit rate >10% when GPU is under KV pressure",
+            fix_command=(
+                "Increase CPU DRAM allocated to the KVBM host tier, raise "
+                "kvbm_promotion_threshold to keep blocks warmer before demotion, "
+                "or add NVMe tier capacity for longer-lived sessions"
+            ),
+            confidence=0.75,
+            evidence="metric_correlation",
+        )
+    return None
+
+
 # =============================================================================
 # CHECK REGISTRY
 # =============================================================================
@@ -830,4 +959,6 @@ _ALL_CHECKS = [
     _check_nixl_transfer_dominates,
     _check_lmcache_cold_start,
     _check_batch_itl_tradeoff,
+    _check_router_overhead_dominates,
+    _check_kvbm_tiering_ineffective,
 ]
