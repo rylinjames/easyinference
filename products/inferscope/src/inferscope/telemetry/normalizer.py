@@ -272,8 +272,23 @@ def _compute_goodput(m: NormalizedMetrics) -> None:
     counters (that concept belongs to the client / harness side). Any
     SLO-related waste is already captured by the preemption signal and
     by the HIGH_TTFT / HIGH_ITL checks.
+
+    Throughput sources:
+    - SGLang exposes `sglang:gen_throughput` directly (populates
+      `gen_throughput_tps`).
+    - vLLM, Dynamo, and ATOM do NOT expose a generation-throughput gauge,
+      so we fall back to a derived estimate: with N concurrent active
+      requests and inter-token latency of T seconds, the system produces
+      ~N/T tokens per second. Closes the snapshot v1.0.0 P1 bug
+      `goodput_dead_for_three_engines`.
     """
     raw_throughput = m.gen_throughput_tps
+    if raw_throughput <= 0:
+        # Fallback for engines that don't expose a gen_throughput gauge
+        # (vLLM, Dynamo, ATOM). Both fields are populated by all 4
+        # engines per the normalize() branches.
+        if m.itl_avg_s and m.itl_avg_s > 0 and m.requests_running > 0:
+            raw_throughput = m.requests_running / m.itl_avg_s
     if raw_throughput <= 0:
         return
 
