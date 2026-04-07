@@ -38,7 +38,13 @@ _REQUIRED_PRIMARY_PREFIXES = [
 
 _REQUIRED_CACHE_PREFIXES = [
     "lmcache:",
-    "dynamo_component_kvstats_",
+    # KV-stats metrics live under the broader `dynamo_component_` prefix
+    # already covered by _REQUIRED_PRIMARY_PREFIXES — the real names are
+    # `dynamo_component_total_blocks` and
+    # `dynamo_component_gpu_cache_usage_percent`. Earlier revisions of
+    # this file declared a separate `dynamo_component_kvstats_` prefix;
+    # there is no such namespace in the Dynamo source. Closes the
+    # snapshot v1.0.0 P0 bug `dynamo_required_metric_prefixes_fictional`.
 ]
 
 # In disaggregated (split prefill/decode) topology, prefill and decode

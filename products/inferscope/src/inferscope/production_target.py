@@ -209,10 +209,17 @@ BACKEND_METRICS = [
     "dynamo_component_requests_total",
 ]
 KV_METRICS = [
-    "dynamo_component_kvstats_gpu_cache_usage_percent",
-    "dynamo_component_kvstats_gpu_prefix_cache_hit_rate",
-    "dynamo_component_kvstats_active_blocks",
-    "dynamo_component_kvstats_total_blocks",
+    # Real Dynamo KV metric names per telemetry/prometheus.py::DYNAMO_METRICS
+    # (verified at lines 149-150 and the historical correction note at
+    # lines 134-148). Earlier revisions of this list declared four
+    # `dynamo_component_kvstats_*` names that are fictional — the
+    # `kvstats` namespace does not exist in the Dynamo source.
+    # `active_blocks` and `gpu_prefix_cache_hit_rate` were also invented
+    # and have no upstream emission point; active blocks can be derived
+    # client-side as `total_blocks * gpu_cache_usage_percent`.
+    # Closes the snapshot v1.0.0 P0 bug `dynamo_required_metric_prefixes_fictional`.
+    "dynamo_component_total_blocks",
+    "dynamo_component_gpu_cache_usage_percent",
 ]
 TRACE_ENV_VARS = [
     "DYN_LOGGING_JSONL",
