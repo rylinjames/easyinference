@@ -5,8 +5,15 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from inferscope.benchmarks.catalog import materialize_workload
 from inferscope.benchmarks.models import ChatMessage, WorkloadPack, WorkloadRequest
 from inferscope.benchmarks.openai_replay import run_openai_replay
+from inferscope.benchmarks.procedural import ProceduralWorkloadOptions
+
+
+def _seed_pack_name_for_model(model_name: str) -> str:
+    """Pick a procedural seed pack name based on the target model."""
+    return "kimi-k2-long-context-coding" if "kimi" in model_name.lower() else "coding-long-context"
 
 
 @dataclass
@@ -58,26 +65,37 @@ class KVDisaggTransferResult:
 
 
 def _build_disagg_transfer_pack(model_name: str, isl: int) -> WorkloadPack:
-    return WorkloadPack(
-        name=f"kv-disagg-transfer-{isl}",
-        description="Live KV disaggregated transfer probe",
-        workload_class="kv_disagg_transfer",
-        model=model_name,
-        concurrency=1,
-        stream=True,
-        requests=[
-            WorkloadRequest(
-                name=f"transfer-{isl}",
-                messages=[ChatMessage(role="user", content=f"Probe disaggregated transfer for a {isl}-token context.")],
-                max_tokens=64,
-                metadata={
-                    "phase": "kv_disagg_transfer",
-                    "isl": isl,
-                    "approx_context_tokens": isl,
-                },
-            )
-        ],
+    """Build a disagg-transfer workload pack with a single prompt shaped to the
+    labeled ISL.
+
+    Closes the snapshot v1.0.0 P0 bug `kv_phase_runner_synthetic_prompt_size`.
+    Earlier drafts produced ~9-token prompts regardless of `isl`.
+    """
+    options = ProceduralWorkloadOptions(
+        request_count=1,
+        input_tokens=isl,
+        output_tokens=64,
+        seed=isl,
     )
+    materialized = materialize_workload(_seed_pack_name_for_model(model_name), options=options)
+    materialized = materialized.model_copy(
+        update={
+            "name": f"kv-disagg-transfer-{isl}",
+            "description": "Live KV disaggregated transfer probe",
+            "workload_class": "kv_disagg_transfer",
+            "model": model_name,
+            "concurrency": 1,
+            "stream": True,
+        }
+    )
+    for request in materialized.requests:
+        request.metadata = {
+            **(request.metadata or {}),
+            "phase": "kv_disagg_transfer",
+            "isl": isl,
+            "approx_context_tokens": isl,
+        }
+    return materialized
 
 
 async def run_kv_disagg_transfer(

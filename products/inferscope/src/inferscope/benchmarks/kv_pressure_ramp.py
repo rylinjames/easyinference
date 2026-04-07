@@ -5,8 +5,15 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from inferscope.benchmarks.catalog import materialize_workload
 from inferscope.benchmarks.models import ChatMessage, WorkloadPack, WorkloadRequest
 from inferscope.benchmarks.openai_replay import run_openai_replay
+from inferscope.benchmarks.procedural import ProceduralWorkloadOptions
+
+
+def _seed_pack_name_for_model(model_name: str) -> str:
+    """Pick a procedural seed pack name based on the target model."""
+    return "kimi-k2-long-context-coding" if "kimi" in model_name.lower() else "coding-long-context"
 
 
 @dataclass
@@ -68,28 +75,39 @@ class KVPressureProfileResult:
 
 
 def _build_pressure_ramp_pack(model_name: str, isl: int, concurrency: int) -> WorkloadPack:
-    return WorkloadPack(
-        name=f"kv-pressure-ramp-{isl}-{concurrency}",
-        description="Live KV pressure ramp",
-        workload_class="kv_pressure_ramp",
-        model=model_name,
-        concurrency=concurrency,
-        stream=True,
-        requests=[
-            WorkloadRequest(
-                name=f"pressure-{idx + 1}",
-                messages=[ChatMessage(role="user", content=f"Probe pressure at {isl} tokens.")],
-                max_tokens=64,
-                metadata={
-                    "phase": "kv_pressure_ramp",
-                    "isl": isl,
-                    "approx_context_tokens": isl,
-                    "probe_concurrency": concurrency,
-                },
-            )
-            for idx in range(concurrency)
-        ],
+    """Build a pressure-ramp workload pack with prompts shaped to the labeled ISL.
+
+    Closes the snapshot v1.0.0 P0 bug `kv_phase_runner_synthetic_prompt_size`.
+    Earlier drafts produced ~6-token prompts regardless of `isl`. The fix
+    routes through `materialize_workload` to shape the prompts to ~`isl` tokens.
+    """
+    options = ProceduralWorkloadOptions(
+        request_count=concurrency,
+        input_tokens=isl,
+        output_tokens=64,
+        seed=isl,
     )
+    materialized = materialize_workload(_seed_pack_name_for_model(model_name), options=options)
+    materialized = materialized.model_copy(
+        update={
+            "name": f"kv-pressure-ramp-{isl}-{concurrency}",
+            "description": "Live KV pressure ramp",
+            "workload_class": "kv_pressure_ramp",
+            "model": model_name,
+            "concurrency": concurrency,
+            "stream": True,
+        }
+    )
+    for idx, request in enumerate(materialized.requests):
+        request.metadata = {
+            **(request.metadata or {}),
+            "phase": "kv_pressure_ramp",
+            "isl": isl,
+            "approx_context_tokens": isl,
+            "probe_concurrency": concurrency,
+            "probe_request_index": idx,
+        }
+    return materialized
 
 
 async def run_kv_pressure_ramp(

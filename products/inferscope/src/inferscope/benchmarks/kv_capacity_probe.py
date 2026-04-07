@@ -7,44 +7,79 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any
 
+from inferscope.benchmarks.catalog import materialize_workload
 from inferscope.benchmarks.models import WorkloadPack, WorkloadRequest, ChatMessage
 from inferscope.benchmarks.openai_replay import run_openai_replay
+from inferscope.benchmarks.procedural import ProceduralWorkloadOptions
 from inferscope.optimization.memory_planner import plan_memory, MemoryPlan
 from inferscope.models.registry import ModelVariant
 from inferscope.hardware.gpu_profiles import GPUProfile
 
 logger = logging.getLogger(__name__)
 
+# Map phase-runner model names to seed packs that materialize_procedural_workload
+# knows how to expand. The Kimi production lane uses the dedicated seed; every
+# other coding model falls back to coding-long-context.
+_SEED_PACK_FOR_KIMI = "kimi-k2-long-context-coding"
+_SEED_PACK_FOR_CODING = "coding-long-context"
+
+
+def _seed_pack_name_for_model(model_name: str) -> str:
+    """Pick a procedural seed pack name based on the target model."""
+    name_lower = model_name.lower()
+    if "kimi" in name_lower:
+        return _SEED_PACK_FOR_KIMI
+    return _SEED_PACK_FOR_CODING
+
 
 def _build_capacity_probe_pack(model_name: str, isl: int, concurrency: int) -> WorkloadPack:
-    requests = [
-        WorkloadRequest(
-            name=f"capacity-isl-{isl}-req-{idx + 1}",
-            messages=[
-                ChatMessage(
-                    role="user",
-                    content=f"Summarize the capacity probe context for a {isl}-token prompt.",
-                )
-            ],
-            max_tokens=64,
-            metadata={
-                "phase": "kv_capacity_probe",
-                "isl": isl,
-                "approx_context_tokens": isl,
-                "probe_concurrency": concurrency,
-            },
-        )
-        for idx in range(concurrency)
-    ]
-    return WorkloadPack(
-        name=f"kv-capacity-probe-{isl}",
-        description="Live KV capacity probe",
-        workload_class="kv_capacity_probe",
-        model=model_name,
-        concurrency=concurrency,
-        stream=True,
-        requests=requests,
+    """Build a capacity-probe workload pack with prompts shaped to the labeled ISL.
+
+    Closes the snapshot v1.0.0 P0 bug `kv_phase_runner_synthetic_prompt_size`.
+    Earlier drafts of this helper produced ~22-token prompts regardless of
+    `isl`, so the capacity-probe report was unfaithful by orders of magnitude.
+
+    The fix routes through `materialize_workload` (which calls
+    `materialize_procedural_workload` under the hood) so the prompts are
+    shaped to ~`isl` tokens via `_shape_context`. The materialized pack
+    inherits the seed's tool catalog and request structure; we override
+    `model` and `name` to match the phase runner's caller-facing identity
+    so downstream artifact metadata still reflects which model the probe
+    targeted.
+    """
+    seed_pack_name = _seed_pack_name_for_model(model_name)
+    options = ProceduralWorkloadOptions(
+        request_count=concurrency,
+        input_tokens=isl,
+        output_tokens=64,
+        seed=isl,  # deterministic per-ISL reproducibility
     )
+    materialized = materialize_workload(seed_pack_name, options=options)
+
+    # Override identity fields so the artifact metadata reflects the
+    # phase-runner caller (not the upstream seed pack).
+    materialized = materialized.model_copy(
+        update={
+            "name": f"kv-capacity-probe-{isl}",
+            "description": "Live KV capacity probe",
+            "workload_class": "kv_capacity_probe",
+            "model": model_name,
+            "concurrency": concurrency,
+            "stream": True,
+        }
+    )
+    # Tag every request with the phase-runner metadata that downstream
+    # consumers (audit, comparison, observability) key off of.
+    for idx, request in enumerate(materialized.requests):
+        request.metadata = {
+            **(request.metadata or {}),
+            "phase": "kv_capacity_probe",
+            "isl": isl,
+            "approx_context_tokens": isl,
+            "probe_concurrency": concurrency,
+            "probe_request_index": idx,
+        }
+    return materialized
 
 
 @dataclass

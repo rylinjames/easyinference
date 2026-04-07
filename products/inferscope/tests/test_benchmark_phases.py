@@ -67,6 +67,19 @@ async def test_run_kv_capacity_probe_produces_capacity_curve(monkeypatch: pytest
         del args, kwargs
         concurrency = workload.concurrency
         failed = 1 if concurrency > 4 else 0
+        # Closes bugs/kv_phase_runner_synthetic_prompt_size.md (P0): assert that
+        # the materialized prompts are within ~30% of the labeled ISL, not the
+        # ~22-token synthetic strings the earlier _build_capacity_probe_pack
+        # produced. We use a generous ±30% band because the procedural shaper
+        # adds context blocks until the approx-token target is met, and the
+        # block boundary may overshoot the target by half a block.
+        for request in workload.requests:
+            labeled = request.metadata["approx_context_tokens"]
+            approx = sum(len(m.content) // 4 for m in request.messages)
+            assert 0.7 * labeled <= approx <= 1.5 * labeled, (
+                f"capacity-probe prompt for ISL {labeled} produced ~{approx} "
+                "tokens — phase runner is sending unfaithful prompts"
+            )
         return _artifact(
             pack_name=workload.name,
             failed=failed,
@@ -90,6 +103,14 @@ async def test_run_kv_capacity_probe_produces_capacity_curve(monkeypatch: pytest
 async def test_run_kv_pressure_ramp_returns_points(monkeypatch: pytest.MonkeyPatch) -> None:
     async def fake_run_openai_replay(workload, *args, **kwargs):
         del args, kwargs
+        # Prompt-size faithfulness assertion (closes
+        # bugs/kv_phase_runner_synthetic_prompt_size.md).
+        for request in workload.requests:
+            labeled = request.metadata["approx_context_tokens"]
+            approx = sum(len(m.content) // 4 for m in request.messages)
+            assert 0.7 * labeled <= approx <= 1.5 * labeled, (
+                f"pressure-ramp prompt for ISL {labeled} produced ~{approx} tokens"
+            )
         return _artifact(
             pack_name=workload.name,
             total_requests=workload.concurrency,
@@ -142,6 +163,14 @@ async def test_run_kv_cache_behavior_returns_all_sections(monkeypatch: pytest.Mo
 async def test_run_kv_disagg_transfer_returns_transfer_curve(monkeypatch: pytest.MonkeyPatch) -> None:
     async def fake_run_openai_replay(workload, *args, **kwargs):
         del args, kwargs
+        # Prompt-size faithfulness assertion (closes
+        # bugs/kv_phase_runner_synthetic_prompt_size.md).
+        for request in workload.requests:
+            labeled = request.metadata["approx_context_tokens"]
+            approx = sum(len(m.content) // 4 for m in request.messages)
+            assert 0.7 * labeled <= approx <= 1.5 * labeled, (
+                f"disagg-transfer prompt for ISL {labeled} produced ~{approx} tokens"
+            )
         isl = workload.requests[0].metadata["isl"]
         return _artifact(
             pack_name=workload.name,
