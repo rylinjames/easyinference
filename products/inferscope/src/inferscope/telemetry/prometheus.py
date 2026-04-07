@@ -239,6 +239,12 @@ class ScrapeResult:
     endpoint: str
     engine: str  # "vllm" | "sglang" | "atom" | "dynamo" | "unknown"
     raw_metrics: dict[str, float] = field(default_factory=dict)
+    # Histogram buckets keyed by metric base name (without the `_bucket` suffix).
+    # Each entry is a list of (le_label, cumulative_count) tuples in the order
+    # they were parsed. Populated by scrape_metrics so percentile-aware
+    # consumers don't have to walk `samples` manually. Closes the snapshot
+    # v1.0.0 P1 bug `prometheus_text_parser_correctness` sub-bug 1.
+    histograms: dict[str, list[tuple[str, float]]] = field(default_factory=dict)
     samples: list[MetricSample] = field(default_factory=list)
     error: str = ""
     scrape_time_ms: float = 0.0
@@ -255,6 +261,66 @@ class ScrapeResult:
             return total / count
         return None
 
+    def get_histogram_buckets(self, base_name: str) -> list[tuple[str, float]]:
+        """Return the parsed bucket samples for a histogram, in scrape order.
+
+        Each entry is `(le_label, cumulative_count)` where `le_label` is the
+        upper-bound string from the `le="..."` label (e.g. `"0.5"`, `"1.0"`,
+        `"+Inf"`). Returns an empty list if no buckets were captured.
+        """
+        return self.histograms.get(base_name, [])
+
+
+def _parse_labels(labels_str: str) -> dict[str, str]:
+    """Parse a Prometheus label set string into a dict.
+
+    Handles quoted commas and escaped characters inside label values, which
+    the previous naive ``split(",")`` implementation corrupted. The OpenMetrics
+    spec explicitly allows commas inside quoted label values; the parser uses
+    a small in-quote state machine to respect them. Closes the snapshot v1.0.0
+    P1 bug `prometheus_text_parser_correctness` sub-bug 2.
+    """
+    labels: dict[str, str] = {}
+    if not labels_str:
+        return labels
+
+    in_quote = False
+    escape = False
+    key_start = 0
+    eq_pos = -1
+    n = len(labels_str)
+
+    def _commit(end: int) -> None:
+        if eq_pos > -1:
+            k = labels_str[key_start:eq_pos].strip()
+            v = labels_str[eq_pos + 1 : end].strip()
+            # Strip surrounding double quotes if present and unescape \\, \", \n
+            if v.startswith('"') and v.endswith('"') and len(v) >= 2:
+                v = v[1:-1].replace(r"\\", "\\").replace(r"\"", '"').replace(r"\n", "\n")
+            labels[k] = v
+
+    for i in range(n):
+        ch = labels_str[i]
+        if escape:
+            escape = False
+            continue
+        if ch == "\\" and in_quote:
+            escape = True
+            continue
+        if ch == '"':
+            in_quote = not in_quote
+            continue
+        if ch == "=" and not in_quote and eq_pos == -1:
+            eq_pos = i
+            continue
+        if ch == "," and not in_quote:
+            _commit(i)
+            key_start = i + 1
+            eq_pos = -1
+    # Final pair (no trailing comma)
+    _commit(n)
+    return labels
+
 
 def parse_prometheus_text(text: str) -> list[MetricSample]:
     """Parse Prometheus text exposition format into MetricSample list."""
@@ -269,14 +335,8 @@ def parse_prometheus_text(text: str) -> list[MetricSample]:
             labels_str = match.group(2) or ""
             value_str = match.group(3)
 
-            # Parse labels
-            labels: dict[str, str] = {}
-            if labels_str:
-                for pair in labels_str.split(","):
-                    pair = pair.strip()
-                    if "=" in pair:
-                        k, v = pair.split("=", 1)
-                        labels[k.strip()] = v.strip().strip('"')
+            # Parse labels via the quote-aware helper
+            labels = _parse_labels(labels_str)
 
             # Parse value
             try:
@@ -389,10 +449,15 @@ async def scrape_metrics(
     result.engine = detect_engine_from_metrics(text)
     result.samples = parse_prometheus_text(text)
 
-    # Build flat metric dict (latest value per metric name without labels)
+    # Build flat metric dict (latest value per metric name without labels).
+    # Histogram bucket samples are routed into result.histograms instead so
+    # the flat dict isn't lossy. Closes the snapshot v1.0.0 P1 bug
+    # `prometheus_text_parser_correctness` (sub-bugs 1 and 3).
     for sample in result.samples:
-        # For histogram buckets, keep _sum and _count, skip _bucket
-        if "_bucket{" in f"{sample.name}{{":
+        if sample.name.endswith("_bucket"):
+            base = sample.name[: -len("_bucket")]
+            le_label = sample.labels.get("le", "")
+            result.histograms.setdefault(base, []).append((le_label, sample.value))
             continue
         result.raw_metrics[sample.name] = sample.value
 
