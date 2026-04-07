@@ -55,6 +55,14 @@ class PipelineContext:
     objective: ObjectiveSpec
     forced_engine: str = "auto"
 
+    # Cluster fabric metadata. Without these the recommender forces every
+    # split-topology Dynamo recommendation to TCP KV transport and the
+    # vLLM NixlConnector branch is dead. Closes the snapshot v1.0.0 P0
+    # bug `recommender_inventory_missing_rdma`.
+    has_rdma: bool = False
+    rdma_type: str = ""
+    node_count: int = 1
+
     platform_traits: PlatformTraits | None = None
     engine_type: EngineType | None = None
     precision: PrecisionSpec | None = None
@@ -324,6 +332,14 @@ def _build_inventory(ctx: PipelineContext) -> DeploymentInventory:
         has_helix_parallelism=bool(platform_traits.has_helix_parallelism),
         has_accelerated_softmax=bool(platform_traits.has_accelerated_softmax),
         platform_features=platform_traits.to_dict(),
+        # Cluster fabric metadata, sourced from PipelineContext (which is in
+        # turn sourced from `recommend()`'s `has_rdma` parameter). Closes
+        # the snapshot v1.0.0 P0 bug `recommender_inventory_missing_rdma`.
+        # Without these, the vLLM NixlConnector branch is dead through the
+        # recommender and Dynamo split-topology always sets DYNAMO_KV_TRANSPORT="tcp".
+        has_rdma=ctx.has_rdma,
+        rdma_type=ctx.rdma_type,
+        node_count=ctx.node_count,
     )
 
 
@@ -334,8 +350,19 @@ def recommend(
     workload: WorkloadMode = WorkloadMode.CODING,
     engine: str = "auto",
     objective: ObjectiveSpec | None = None,
+    *,
+    has_rdma: bool = False,
+    rdma_type: str = "",
+    node_count: int = 1,
 ) -> tuple[ServingProfile, EngineConfig, MemoryPlan]:
-    """Execute the modular recommendation DAG."""
+    """Execute the modular recommendation DAG.
+
+    Cluster fabric parameters (`has_rdma`, `rdma_type`, `node_count`) flow
+    through the DAG and into the engine compiler. With `has_rdma=True`,
+    Dynamo split-topology configures `DYNAMO_KV_TRANSPORT="rdma"` and the
+    vLLM NixlConnector branch becomes reachable. Closes the snapshot
+    v1.0.0 P0 bug `recommender_inventory_missing_rdma`.
+    """
     ctx = PipelineContext(
         model=model,
         gpu=gpu,
@@ -343,6 +370,9 @@ def recommend(
         workload=workload,
         objective=objective or ObjectiveSpec(),
         forced_engine=engine,
+        has_rdma=has_rdma,
+        rdma_type=rdma_type,
+        node_count=node_count,
     )
 
     nodes: list[DAGNode] = [

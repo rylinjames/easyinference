@@ -79,8 +79,20 @@ def recommend_config(
     workload: str = "coding",
     num_gpus: int = 1,
     engine: str = "dynamo",
+    *,
+    has_rdma: bool = False,
+    rdma_type: str = "",
+    node_count: int = 1,
 ) -> dict:
-    """Generate the supported Dynamo serving config for the production target."""
+    """Generate the supported Dynamo serving config for the production target.
+
+    Cluster fabric parameters (`has_rdma`, `rdma_type`, `node_count`) flow
+    through to the recommender DAG and into the engine compiler. With
+    `has_rdma=True`, Dynamo split-topology configures
+    `DYNAMO_KV_TRANSPORT="rdma"` and the vLLM NixlConnector branch
+    becomes reachable. Closes the snapshot v1.0.0 P0 bug
+    `recommender_inventory_missing_rdma`.
+    """
     resolved, error = _safe_lookup(model, gpu)
     if error is not None:
         return error
@@ -109,6 +121,9 @@ def recommend_config(
             num_gpus=num_gpus,
             workload=workload_mode,
             engine=engine,
+            has_rdma=has_rdma,
+            rdma_type=rdma_type,
+            node_count=node_count,
         )
     except ValueError as e:
         return {"error": str(e), "summary": target_profile_summary(), "confidence": 0.0}
