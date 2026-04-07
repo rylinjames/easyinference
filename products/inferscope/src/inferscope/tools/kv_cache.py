@@ -315,6 +315,7 @@ def recommend_disaggregation(
         avg_prompt_tokens=avg_prompt_tokens,
         gpu_profile=gpu_profile,
         has_fast_transport=has_fast_transport,
+        variant=variant,
     )
 
     if recommended:
@@ -370,6 +371,7 @@ def _estimate_recompute_vs_transfer(
     avg_prompt_tokens: int,
     gpu_profile: Any,
     has_fast_transport: bool,
+    variant: Any | None = None,
 ) -> dict[str, Any]:
     """Estimate the crossover point where KV transfer beats local recompute.
 
@@ -385,8 +387,19 @@ def _estimate_recompute_vs_transfer(
     # Transfer bandwidth estimate
     transfer_bandwidth_gb_s = 25.0 if has_fast_transport else 3.0  # RDMA/NVLink vs PCIe
 
-    # KV bytes per token (approximate for typical models)
-    kv_bytes_per_token = 512  # ~0.5KB per token per layer for FP8 KV
+    # KV bytes per token. Read the real model's per-token total when a model
+    # variant is provided; fall back to the legacy 512-byte heuristic when no
+    # model is in scope. Closes the snapshot v1.0.0 P0 bug
+    # ``recompute_vs_transfer_kv_size_hardcoded`` (the previous hardcode was
+    # ~250x off for Kimi-K2.5).
+    kv_bytes_per_token: float
+    if variant is not None and hasattr(variant, "kv_cache_bytes_per_token_total"):
+        # Use FP8 KV (matches the comment on the legacy 512-byte hardcode and
+        # is the production-target precision for Kimi-K2.5).
+        kv_bytes_per_token = variant.kv_cache_bytes_per_token_total("fp8")
+    else:
+        # Fallback for callers without a model in scope (e.g. unit tests).
+        kv_bytes_per_token = 512  # legacy heuristic — ~0.5KB/token per layer for FP8
 
     # Crossover: recompute_time(N) = transfer_time(N)
     # recompute_time ~= N / prefill_tps (simplified, ignoring quadratic)

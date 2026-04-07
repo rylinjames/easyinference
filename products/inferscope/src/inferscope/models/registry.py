@@ -59,7 +59,13 @@ class ModelVariant:
         return self.params_total_b * multiplier
 
     def kv_cache_bytes_per_token(self, precision: str = "fp16") -> float:
-        """KV cache bytes per token per layer."""
+        """KV cache bytes per token PER LAYER.
+
+        Note: this returns a per-layer figure. Callers that want the
+        whole-model total should use ``kv_cache_bytes_per_token_total``,
+        which correctly handles hybrid models where only a subset of layers
+        actually carry standard KV (the rest use Mamba/Gated-DeltaNet state).
+        """
         dtype_bytes = {"fp16": 2.0, "bf16": 2.0, "fp8_e4m3": 1.0, "fp8": 1.0, "auto": 2.0}
         bpt = dtype_bytes.get(precision, 2.0)
 
@@ -69,8 +75,41 @@ class ModelVariant:
             latent_dim = int(latent_dim_raw) if isinstance(latent_dim_raw, int | float) else 512
             return 2 * latent_dim * bpt  # K + V latent vectors
         else:
-            # Standard GQA: 2 * kv_heads * head_dim * bytes
+            # Standard GQA / MHA / hybrid: 2 * kv_heads * head_dim * bytes.
+            # For HYBRID models the per-layer figure is the same as GQA — only
+            # the LAYER COUNT differs. kv_cache_bytes_per_token_total handles
+            # that correction.
             return 2 * self.kv_heads * self.head_dim * bpt
+
+    def kv_cache_bytes_per_token_total(self, precision: str = "fp16") -> float:
+        """Whole-model KV cache bytes per token (per-layer × number of KV layers).
+
+        For dense GQA / MHA / MLA models this is just
+        ``kv_cache_bytes_per_token(precision) * self.layers``.
+
+        For HYBRID models (e.g. ``Qwen3-Coder-Next``) only a subset of layers
+        carry standard KV — the rest use Mamba / Gated-DeltaNet state which is
+        a fixed per-sequence cost, not per-token. The number of KV-bearing
+        layers comes from ``serving["kv_layers"]`` when present; otherwise we
+        fall back to ``self.layers``.
+
+        Direct callers that need the whole-model per-token KV size MUST use
+        this method instead of ``kv_cache_bytes_per_token() * self.layers``.
+        Per-layer × all-layers overstates KV by 4x for ``Qwen3-Coder-Next``
+        (12 KV layers, 36 deltanet layers, 48 total).
+
+        Closes the snapshot v1.0.0 P0 bug ``hybrid_attention_kv_undercount``.
+        """
+        per_layer = self.kv_cache_bytes_per_token(precision)
+        if self.attention_type == "hybrid":
+            # Hybrid models declare which subset of layers carry standard KV
+            # via the ``kv_layers`` serving hint. Fall back to the total layer
+            # count only if the hint is absent (preserves the legacy answer).
+            kv_layers_raw = self.serving.get("kv_layers")
+            if isinstance(kv_layers_raw, int) and kv_layers_raw > 0:
+                return per_layer * kv_layers_raw
+        # Standard path: every layer carries KV.
+        return per_layer * max(self.layers, 1)
 
     def to_dict(self) -> dict[str, Any]:
         return {
