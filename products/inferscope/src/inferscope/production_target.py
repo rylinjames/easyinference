@@ -407,8 +407,26 @@ def _minimum_tp_for_lane(model: ModelVariant) -> int:
 
 
 def _minimum_tp_for_gpu(model: ModelVariant, gpu: GPUProfile | None) -> int:
+    # Models that declare BF16 as the recommended KV dtype (or that explicitly
+    # mark `kv_cache_quantizable=False`) should prefer BF16 TP hints over FP8
+    # ones — using the FP8 hint for a model that needs BF16 KV doubles the
+    # per-token KV size and likely OOMs at long context. Closes the snapshot
+    # v1.0.0 P1 bug `model_registry_serving_drift` sub-bug B.
+    use_bf16 = (
+        not model.serving.get("kv_cache_quantizable", True)
+        or model.serving.get("recommended_kv_dtype") == "bf16"
+    )
+
     if gpu is None:
-        for key in ("tp_fp8_h200", "tp_fp8_b200", "tp_fp8_b300", "tp_fp8_h100"):
+        keys_to_check: tuple[str, ...]
+        if use_bf16:
+            keys_to_check = (
+                "tp_bf16_h200", "tp_bf16_b200", "tp_bf16_b300", "tp_bf16_h100",
+                "tp_fp8_h200", "tp_fp8_b200", "tp_fp8_b300", "tp_fp8_h100",
+            )
+        else:
+            keys_to_check = ("tp_fp8_h200", "tp_fp8_b200", "tp_fp8_b300", "tp_fp8_h100")
+        for key in keys_to_check:
             hinted = model.serving.get(key)
             if isinstance(hinted, int) and hinted > 0:
                 return hinted
@@ -416,15 +434,26 @@ def _minimum_tp_for_gpu(model: ModelVariant, gpu: GPUProfile | None) -> int:
 
     name = gpu.name.lower()
     candidate_keys: list[str] = []
+    # Prefer BF16 hints first if the model declares them, then fall back to
+    # the corresponding FP8/FP4 hints. The FP8/FP4 hints stay as a safety
+    # net for cases where a BF16 hint is missing for a particular GPU.
     if "h100" in name:
+        if use_bf16:
+            candidate_keys.append("tp_bf16_h100")
         candidate_keys.append("tp_fp8_h100")
     elif "h200" in name:
+        if use_bf16:
+            candidate_keys.append("tp_bf16_h200")
         candidate_keys.append("tp_fp8_h200")
     elif gpu.name == "B200":
+        if use_bf16:
+            candidate_keys.append("tp_bf16_b200")
         if gpu.fp4_support:
             candidate_keys.append("tp_fp4_b200")
         candidate_keys.append("tp_fp8_b200")
     elif gpu.name == "B300":
+        if use_bf16:
+            candidate_keys.append("tp_bf16_b300")
         if gpu.fp4_support:
             candidate_keys.append("tp_fp4_b300")
         candidate_keys.append("tp_fp8_b300")

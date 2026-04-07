@@ -164,6 +164,7 @@ _register(
         kv_heads=8,
         head_dim=128,
         layers=64,
+        vocab_size=151936,
         serving={"vllm_flags": "--trust-remote-code", "tp_fp8": 1, "tp_bf16": 2},
     )
 )
@@ -181,6 +182,7 @@ _register(
         kv_heads=4,
         head_dim=128,
         layers=28,
+        vocab_size=152064,
         serving={"tp_fp16": 1, "tp_fp8": 1},
     )
 )
@@ -198,6 +200,7 @@ _register(
         kv_heads=8,
         head_dim=128,
         layers=80,
+        vocab_size=151936,
         serving={"vllm_flags": "--trust-remote-code", "tp_fp8": 2, "tp_bf16": 4},
     )
 )
@@ -217,6 +220,7 @@ _register(
         layers=60,
         experts_total=512,
         experts_active=10,
+        vocab_size=151936,
         mtp_speculative=True,
         serving={
             "temperature": 0.6,
@@ -247,6 +251,7 @@ _register(
         layers=61,
         experts_total=256,
         experts_active=8,
+        vocab_size=129280,
         serving={
             "mla_latent_dim": 512,
             "compression_ratio": 32,
@@ -275,6 +280,7 @@ _register(
         layers=61,
         experts_total=256,
         experts_active=8,
+        vocab_size=129280,
         serving={
             "mla_latent_dim": 512,
             "compression_ratio": 32,
@@ -303,6 +309,7 @@ _register(
         kv_heads=4,
         head_dim=128,
         layers=28,
+        vocab_size=152064,
         serving={"tp_fp16": 1, "note": "Standard Qwen architecture — no special flags needed"},
     )
 )
@@ -320,6 +327,7 @@ _register(
         kv_heads=8,
         head_dim=128,
         layers=80,
+        vocab_size=128256,
         serving={"tp_fp8_h200": 1, "tp_fp8_h100": 2, "tp_fp16_mi300x": 1},
     )
 )
@@ -389,7 +397,15 @@ _register(
             "support_tier": "benchmark_supported",
             "kv_estimation_mode": "exact",
             "hf_id": "Qwen/Qwen3-Coder-480B-A35B-Instruct",
-            "hf_id_fp8": "Qwen/Qwen3.5-397B-A17B-FP8",
+            # NOTE: there is no first-party FP8 build of
+            # Qwen3-Coder-480B-A35B-Instruct upstream at the time of this
+            # snapshot. Earlier revisions of this entry listed
+            # `Qwen/Qwen3.5-397B-A17B-FP8` here, which is a completely
+            # different model (a 397B from a different family) — that was
+            # a copy-paste error from the Qwen3.5-397B-A17B entry. Closes
+            # the snapshot v1.0.0 P1 bug `model_registry_serving_drift`
+            # sub-bug A. If a first-party FP8 build appears upstream, add
+            # `"hf_id_fp8": "Qwen/Qwen3-Coder-480B-A35B-Instruct-FP8"` back here.
             "tp_fp8_h100": 8,
             "tp_fp8_h200": 8,
             "tp_fp8_b200": 4,
@@ -496,6 +512,7 @@ _register(
         attention_type="GQA",
         kv_heads=8,
         head_dim=128,
+        vocab_size=151552,
         serving={
             "available": False,
             "min_gpus": {
@@ -525,6 +542,7 @@ _register(
         layers=60,
         experts_total=160,
         experts_active=8,
+        vocab_size=151552,
         serving={
             "target_profile": "dynamo_long_context_coding",
             "dynamo_backend": "vllm",
@@ -559,6 +577,7 @@ _register(
         context_length=1048576,
         attention_type="GQA",
         kv_heads=8,  # Estimated — official architecture docs under-specified
+        vocab_size=200064,
         serving={
             "vllm_flags": (
                 "--trust-remote-code --tool-call-parser minimax_m2 --reasoning-parser minimax_m2_append_think"
@@ -586,6 +605,7 @@ _register(
         layers=32,
         experts_total=8,
         experts_active=2,
+        vocab_size=32000,
         serving={"tp_fp8_h100": 1, "tp_fp16_a100": 2},
     )
 )
@@ -605,6 +625,7 @@ _register(
         layers=56,
         experts_total=8,
         experts_active=2,
+        vocab_size=32000,
         serving={"tp_fp8": 2, "tp_fp16": 4},
     )
 )
@@ -624,6 +645,7 @@ _register(
         kv_heads=8,
         head_dim=128,
         layers=32,
+        vocab_size=128256,
         serving={"tp_fp16": 1, "tp_fp8": 1},
     )
 )
@@ -641,6 +663,7 @@ _register(
         kv_heads=8,
         head_dim=128,
         layers=80,
+        vocab_size=128256,
         serving={"tp_fp8_h200": 1, "tp_fp8_h100": 2, "tp_fp16": 4},
     )
 )
