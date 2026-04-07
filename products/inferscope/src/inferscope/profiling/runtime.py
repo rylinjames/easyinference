@@ -567,10 +567,10 @@ def build_deployment_context(
         kv_cache_dtype=hints.kv_cache_dtype,
         quantization=hints.quantization,
         block_size=hints.block_size,
-        env_vars={},
+        env_vars=dict(hints.env_vars),
         has_rdma=hints.has_rdma,
         split_prefill_decode=hints.split_prefill_decode,
-        prefix_caching=True,
+        prefix_caching=hints.prefix_caching,
         max_num_batched_tokens=int(scheduler.get("batched_token_budget", 0) or 0),
     )
 

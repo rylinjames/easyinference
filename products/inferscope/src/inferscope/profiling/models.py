@@ -104,6 +104,18 @@ class RuntimeContextHints(BaseModel):
     block_size: int = 0
     has_rdma: bool = False
     split_prefill_decode: bool = False
+    # Operator-supplied environment variables that affect serving behavior.
+    # Used by audit checks like _check_aiter_disabled,
+    # _check_wrong_attention_backend, and _check_fp8bmm_crash_risk which
+    # gate on values like VLLM_ROCM_USE_AITER, ROCM_AITER_MLA, and
+    # VLLM_ROCM_USE_AITER_FP8BMM. Closes the snapshot v1.0.0 P0 bug
+    # `runtime_deployment_context_dead_branches`.
+    env_vars: dict[str, str] = Field(default_factory=dict)
+    # Whether prefix caching is enabled in the engine. Used by
+    # _check_prefix_cache_disabled. Defaults to True since most engines
+    # have it on by default; operators can pass `prefix_caching=False`
+    # to surface a finding when their deployment runs without it.
+    prefix_caching: bool = True
 
 
 class RuntimeProfileReport(BaseModel):

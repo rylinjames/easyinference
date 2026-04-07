@@ -15,6 +15,8 @@ async def auto_tune_deployment(
     current_workload: str = "",
     current_scheduler: dict[str, Any] | None = None,
     current_cache: dict[str, Any] | None = None,
+    env_vars: dict[str, str] | None = None,
+    prefix_caching: bool = True,
     allow_private: bool = True,
     *,
     metrics_auth: EndpointAuthConfig | None = None,
@@ -24,7 +26,11 @@ async def auto_tune_deployment(
 
     bundle = await analyze_runtime(
         endpoint,
-        context_hints=RuntimeContextHints(engine=current_engine),
+        context_hints=RuntimeContextHints(
+            engine=current_engine,
+            env_vars=env_vars or {},
+            prefix_caching=prefix_caching,
+        ),
         current_scheduler=current_scheduler,
         current_cache=current_cache,
         allow_private=allow_private,

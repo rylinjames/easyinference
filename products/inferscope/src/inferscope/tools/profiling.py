@@ -63,6 +63,8 @@ async def profile_runtime(
     block_size: int = 0,
     has_rdma: bool = False,
     split_prefill_decode: bool = False,
+    env_vars: dict[str, str] | None = None,
+    prefix_caching: bool = True,
     current_scheduler: dict[str, Any] | None = None,
     current_cache: dict[str, Any] | None = None,
     allow_private: bool = True,
@@ -90,6 +92,8 @@ async def profile_runtime(
         block_size=block_size,
         has_rdma=has_rdma,
         split_prefill_decode=split_prefill_decode,
+        env_vars=env_vars or {},
+        prefix_caching=prefix_caching,
     )
     try:
         report = await build_runtime_profile(
