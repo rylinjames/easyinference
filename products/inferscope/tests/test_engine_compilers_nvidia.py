@@ -187,6 +187,97 @@ def test_trtllm_compiler_command_round_trips_through_shlex() -> None:
             assert roundtripped == v, f"dict flag {k} did not round-trip through shlex"
 
 
+# ----------------------------------------------------------------------------
+# Compiler-gate contract — bugs/dynamo_compiler_command_set_before_gate.md
+# and bugs/atom_compiler_unsupported_tier_inconsistency.md
+# ----------------------------------------------------------------------------
+
+
+def _profile_with_unsupported_model() -> ServingProfile:
+    """Build a ServingProfile that violates the Dynamo `is_target_model` gate."""
+    return ServingProfile(
+        model="UnsupportedModel-7B",
+        model_class=ModelClass.DENSE_GQA,
+        engine=EngineType.DYNAMO,
+        gpu_type="b200",
+        num_gpus=4,
+        workload_mode=WorkloadMode.CHAT,
+        topology=TopologySpec(tp=4, dp=1, ep=1),
+        scheduler=SchedulerSpec(batched_token_budget=16384, prefill_chunk_tokens=16384, max_num_seqs=64),
+        cache=CacheSpec(gpu_memory_utilization=0.93),
+        precision=PrecisionSpec(weights="fp8", activations="fp8", kv_cache="fp8_e4m3"),
+    )
+
+
+def test_dynamo_compiler_unsupported_model_does_not_populate_command() -> None:
+    """`DynamoCompiler` must run hard support gates BEFORE populating
+    cfg.command. Closes the snapshot v1.0.0 P1 bug
+    `dynamo_compiler_command_set_before_gate`.
+    """
+    compiler = DynamoCompiler()
+    profile = _profile_with_unsupported_model()
+    cfg = compiler.compile(profile, _inventory("b200"))
+
+    assert cfg.support_tier == "unsupported"
+    assert "Kimi-K2.5" in cfg.support_reason
+    assert cfg.command == "", (
+        f"DynamoCompiler populated cfg.command on hard-gate failure: "
+        f"{cfg.command!r}. Hard gates must run before command population."
+    )
+
+
+def test_dynamo_compiler_unsupported_gpu_arch_does_not_populate_command() -> None:
+    """A non-Hopper/Blackwell sm_ arch must early-return without populating
+    command. We use a non-NVIDIA arch to trigger the first hard gate."""
+    compiler = DynamoCompiler()
+    profile = _kimi_dynamo_profile()
+    inventory = _inventory("b200")
+    inventory.gpu_arch = "gfx942"  # AMD MI300X — fails the sm_ prefix gate
+    cfg = compiler.compile(profile, inventory)
+
+    assert cfg.support_tier == "unsupported"
+    assert cfg.command == ""
+
+
+def test_atom_compiler_unsupported_gpu_sets_unsupported_tier() -> None:
+    """`ATOMCompiler` previously left `support_tier="supported"` (the default)
+    on hard-gate failure, leaving callers unable to filter unsupported
+    configs by tier alone. Closes the snapshot v1.0.0 P1 bug
+    `atom_compiler_unsupported_tier_inconsistency`.
+    """
+    from inferscope.engines.atom import ATOMCompiler
+
+    compiler = ATOMCompiler()
+    profile = _profile()  # uses gpu_type="B200"
+    cfg = compiler.compile(profile, _inventory("b200"))  # sm_100 — not gfx94[0|2|5]
+
+    assert cfg.support_tier == "unsupported", (
+        "ATOMCompiler did not set support_tier='unsupported' on the hard gate. "
+        "Callers filtering by tier will treat the broken config as valid."
+    )
+    assert cfg.support_reason  # populated, not empty
+    assert cfg.command == ""  # the existing correct behavior — doesn't populate command
+    assert any("AMD" in w for w in cfg.warnings)
+
+
+def test_atom_compiler_amd_gpu_still_compiles() -> None:
+    """Regression: ATOMCompiler must still produce a usable config on
+    AMD hardware (the happy path)."""
+    from inferscope.engines.atom import ATOMCompiler
+
+    compiler = ATOMCompiler()
+    inventory = _inventory("b200")
+    inventory.gpu_arch = "gfx942"
+    inventory.gpu_type = "MI300X"
+    profile = _profile()
+    cfg = compiler.compile(profile, inventory)
+
+    # The happy path leaves support_tier at the dataclass default
+    # ("supported") and populates cli_flags.
+    assert cfg.support_tier == "supported"
+    assert "model" in cfg.cli_flags
+
+
 def test_vllm_compiler_handles_single_quote_in_dict_value() -> None:
     """If a dict-valued cli_flag contains a string with a single quote, the
     resulting command must still parse via shlex (the previous f-string

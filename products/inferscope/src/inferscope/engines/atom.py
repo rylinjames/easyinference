@@ -33,9 +33,17 @@ class ATOMCompiler(ConfigCompiler):
     def compile(self, profile: ServingProfile, inventory: DeploymentInventory) -> EngineConfig:
         cfg = EngineConfig(engine="atom")
 
-        # Validate: ATOM only works on AMD hardware
+        # Validate: ATOM only works on AMD hardware. Set support_tier
+        # explicitly so callers filtering on tier alone can detect the
+        # rejection — matches DynamoCompiler's contract.
+        # Closes the snapshot v1.0.0 P1 bug
+        # `atom_compiler_unsupported_tier_inconsistency`.
         if inventory.gpu_arch not in ("gfx942", "gfx950"):
-            cfg.warnings.append(f"ATOM requires AMD MI300X/MI325X/MI355X (gfx942/gfx950), got {inventory.gpu_arch}")
+            cfg.support_tier = "unsupported"
+            cfg.support_reason = (
+                f"ATOM requires AMD MI300X/MI325X/MI355X (gfx942/gfx950), got {inventory.gpu_arch}"
+            )
+            cfg.warnings.append(cfg.support_reason)
             return cfg
 
         # --- Model ---

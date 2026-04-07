@@ -68,16 +68,11 @@ class DynamoCompiler(ConfigCompiler):
 
     def compile(self, profile: ServingProfile, inventory: DeploymentInventory) -> EngineConfig:
         cfg = EngineConfig(engine="dynamo")
-        cfg.command = (
-            "python -m dynamo.vllm "
-            f"--model {profile.model} "
-            f"--tensor-parallel-size {profile.topology.tp} "
-            f"--max-num-seqs {profile.scheduler.max_num_seqs}"
-        )
-        cfg.env_vars["DYNAMO_CONFIG_FILE"] = "dynamo-config.yaml"
-        cfg.support_tier = "supported"
-        cfg.support_reason = "Dynamo + LMCache is the supported production lane for InferScope long-context coding."
 
+        # --- Hard support gates run FIRST. On failure we return early
+        # without populating cfg.command, so an unsupported config never
+        # carries a misleading launch command. Closes the snapshot v1.0.0
+        # P1 bug `dynamo_compiler_command_set_before_gate`.
         if not inventory.gpu_arch.startswith("sm_"):
             cfg.support_tier = "unsupported"
             cfg.support_reason = "Dynamo requires NVIDIA Hopper or Blackwell GPUs."
@@ -95,6 +90,17 @@ class DynamoCompiler(ConfigCompiler):
             cfg.support_reason = "Supported models are limited to Kimi-K2.5."
             cfg.warnings.append(cfg.support_reason)
             return cfg
+
+        # --- Gates passed: populate command, env vars, support metadata.
+        cfg.command = (
+            "python -m dynamo.vllm "
+            f"--model {profile.model} "
+            f"--tensor-parallel-size {profile.topology.tp} "
+            f"--max-num-seqs {profile.scheduler.max_num_seqs}"
+        )
+        cfg.env_vars["DYNAMO_CONFIG_FILE"] = "dynamo-config.yaml"
+        cfg.support_tier = "supported"
+        cfg.support_reason = "Dynamo + LMCache is the supported production lane for InferScope long-context coding."
 
         split_topology = profile.topology.split_prefill_decode
         lmcache_mode = (
