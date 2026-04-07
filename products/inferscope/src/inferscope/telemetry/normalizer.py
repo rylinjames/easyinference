@@ -26,7 +26,7 @@ class NormalizedMetrics:
     # Cache
     kv_cache_usage: float = 0.0  # 0-1
     prefix_cache_hit_rate: float = 0.0  # 0-1
-    cpu_cache_usage: float = 0.0  # 0-1
+    cpu_cache_usage: float = 0.0  # 0-1; populated by vLLM and Dynamo (via vLLM workers); not by SGLang/ATOM
 
     # Throughput (counters — need rate() for per-second)
     prompt_tokens_total: float = 0.0
@@ -395,6 +395,17 @@ def normalize(scrape: ScrapeResult) -> NormalizedMetrics:
         m.kv_cache_usage = scrape.get("dynamo_component_gpu_cache_usage_percent") or scrape.get(
             "vllm:gpu_cache_usage_perc"
         )
+        # CPU cache usage: Dynamo does not emit a worker-side cpu cache
+        # gauge, but its vLLM workers DO expose `vllm:cpu_cache_usage_perc`
+        # whenever an operator scrapes a vLLM worker endpoint alongside
+        # the Dynamo frontend. Adding the fallback here lets the
+        # PCIE_OFFLOAD_THRASH audit check fire on the production lane
+        # (Dynamo) when KV blocks are thrashing between GPU HBM and
+        # CPU DRAM. Closes the snapshot v1.0.0 P1 bug
+        # `cpu_cache_usage_dynamo_zero`.
+        cpu_usage = scrape.get("vllm:cpu_cache_usage_perc")
+        if cpu_usage:
+            m.cpu_cache_usage = cpu_usage
         # Prefix cache hit rate: Dynamo does NOT emit a worker-side
         # `dynamo_component_gpu_prefix_cache_hit_rate` metric (verified
         # by exhaustive grep across the entire ai-dynamo/dynamo repo).
