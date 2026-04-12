@@ -23,7 +23,7 @@ import modal
 
 app = modal.App("inferscope-kv-quant")
 
-MODEL_ID = "meta-llama/Llama-3.1-8B-Instruct"
+MODEL_ID = "Qwen/Qwen2.5-7B-Instruct"
 
 # Long-context prompts to stress KV cache
 PROMPTS = [
@@ -98,8 +98,23 @@ def _run_benchmark(model_id: str, kv_dtype: str, prompts: list[str]) -> dict:
         n_tokens = len(comp.token_ids)
         total_completion_tokens += n_tokens
 
+    # vLLM runs in a subprocess, so torch.cuda stats may be zero in the parent.
+    # Use nvidia-smi as fallback for accurate GPU memory measurement.
     mem_peak = torch.cuda.max_memory_allocated() / (1024 * 1024)
     mem_current = torch.cuda.memory_allocated() / (1024 * 1024)
+
+    if mem_peak == 0:
+        import subprocess
+        try:
+            smi = subprocess.run(
+                ["nvidia-smi", "--query-gpu=memory.used", "--format=csv,noheader,nounits"],
+                capture_output=True, text=True, check=True,
+            )
+            mem_peak = float(smi.stdout.strip().split("\n")[0])
+            mem_current = mem_peak
+        except Exception:
+            mem_peak = -1.0
+            mem_current = -1.0
 
     throughput = total_completion_tokens / wall_time if wall_time > 0 else 0
 
@@ -147,7 +162,9 @@ def run_kv_quant_comparison():
     print(f"  Throughput: {fp8_result['throughput_tok_s']:.1f} tok/s")
 
     # Compute deltas
-    mem_savings = 1.0 - (fp8_result["gpu_memory_peak_mb"] / fp16_result["gpu_memory_peak_mb"])
+    fp16_mem = fp16_result["gpu_memory_peak_mb"]
+    fp8_mem = fp8_result["gpu_memory_peak_mb"]
+    mem_savings = (1.0 - fp8_mem / fp16_mem) if fp16_mem > 0 else 0.0
     throughput_gain = fp8_result["throughput_tok_s"] / fp16_result["throughput_tok_s"] if fp16_result["throughput_tok_s"] > 0 else 0
 
     comparison = {

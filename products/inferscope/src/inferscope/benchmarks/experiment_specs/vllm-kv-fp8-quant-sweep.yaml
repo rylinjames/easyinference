@@ -1,0 +1,31 @@
+version: "1"
+name: vllm-kv-fp8-quant-sweep
+description: A/B comparison of FP16 vs FP8 KV cache quantization on vLLM. Targets TurboQuant wedge (vLLM #38171).
+engine: vllm
+workload: coding-smoke
+benchmark_role: operator_extension
+model: ""
+target_gpu_families: [hopper, blackwell, blackwell_ultra]
+target_model_classes: []
+focus_areas: [kv_cache, quantization, memory, throughput]
+topology:
+  mode: single_endpoint
+  session_routing: none
+  request_target_name: primary
+  notes:
+    - Run twice: once with --kv-cache-dtype auto (FP16), once with --kv-cache-dtype fp8.
+    - Compare artifacts with inferscope benchmark-compare to measure memory savings and throughput delta.
+cache:
+  strategy: default
+  tiers: [gpu_hbm]
+  connector: none
+  session_affinity: false
+  prefix_cache_expected: true
+  notes:
+    - Prefix caching should be enabled for both runs to isolate KV dtype effect.
+metrics_targets:
+  - name: primary
+    role: primary
+    endpoint_source: request_endpoint
+    expected_engine: vllm
+tags: [vllm, kv_cache, fp8, quantization, turbo_quant, wedge]

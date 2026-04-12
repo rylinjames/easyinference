@@ -1,0 +1,47 @@
+workload_name: "rl_rollout"
+workload_id: "wl5"
+description: "GRPO/PPO rollout workload with bimodal P_max and batch-synchronized arrivals"
+
+trace:
+  type: "synthetic_rl_rollout"
+  generator: "workloads.rl_rollout.RLRolloutGenerator"
+  seed: 42
+  num_requests: 1000
+  batch_size: 32
+  pmax_distribution: "bimodal"
+  pmax_fixed: 2048
+  pmax_easy: 256
+  pmax_hard: 2048
+  easy_fraction: 0.6
+
+context:
+  input_tokens:
+    min: 100
+    max: 500
+    growth: "none"
+  output_tokens:
+    median: 512
+    min: 64
+    max: 2048
+
+arrival:
+  model: "batch"
+  batch_size: 32
+  rate_sweep: [1, 2, 4, 8, 16]
+
+session:
+  sticky: false
+  prefix_reuse: true
+  prefix_shared_tokens: 50  # system prompt only
+
+sampling:
+  temperature: 0.0
+  max_tokens: 2048
+  logprobs: 1  # critical for RL training signal
+
+slo:
+  ttft_p95_ms: 2000
+  tpot_p95_ms: 40
+
+priority: "throughput"
+timeout_seconds: 120

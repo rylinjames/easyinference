@@ -1,0 +1,78 @@
+version: "1"
+name: rl-rollout-smoke
+description: Smoke-test workload for RL rollout validation. Short GRPO-style prompts with logprob capture.
+workload_class: rl_rollout
+benchmark_role: operator_extension
+target_gpu_families: []
+target_model_classes: []
+focus_areas: [rl_rollout, logprobs, pmax, throughput]
+model: null
+endpoint_path: /v1/chat/completions
+concurrency: 8
+stream: true
+tags: [rl, grpo, rollout, logprobs, wedge]
+requests:
+  - name: math_easy
+    messages:
+      - role: system
+        content: "You are a helpful assistant. Answer concisely."
+      - role: user
+        content: "What is 17 × 23?"
+    max_tokens: 256
+    temperature: 0.0
+    metadata:
+      prompt_type: math
+      difficulty: easy
+      pmax: 256
+
+  - name: math_medium
+    messages:
+      - role: system
+        content: "You are a helpful assistant. Show your reasoning step by step."
+      - role: user
+        content: "Find the derivative of f(x) = 3x^4 + 2x^2 - 7x + 1"
+    max_tokens: 512
+    temperature: 0.0
+    metadata:
+      prompt_type: math
+      difficulty: medium
+      pmax: 512
+
+  - name: code_easy
+    messages:
+      - role: system
+        content: "You are a helpful assistant. Answer concisely."
+      - role: user
+        content: "Write a Python function to check if a number is prime."
+    max_tokens: 512
+    temperature: 0.0
+    metadata:
+      prompt_type: code
+      difficulty: easy
+      pmax: 512
+
+  - name: code_hard
+    messages:
+      - role: system
+        content: "You are a helpful assistant. Show your reasoning step by step."
+      - role: user
+        content: "Implement a LRU cache in Python with O(1) get and put operations. Include type hints."
+    max_tokens: 2048
+    temperature: 0.0
+    metadata:
+      prompt_type: code
+      difficulty: hard
+      pmax: 2048
+
+  - name: reasoning_medium
+    messages:
+      - role: system
+        content: "You are a helpful assistant. Show your reasoning step by step."
+      - role: user
+        content: "Explain why floating point arithmetic is not associative. Give a concrete example in Python."
+    max_tokens: 1024
+    temperature: 0.0
+    metadata:
+      prompt_type: reasoning
+      difficulty: medium
+      pmax: 1024
