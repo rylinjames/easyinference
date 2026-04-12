@@ -37,6 +37,7 @@ from inferscope.tools.model_intel import (
     get_model_profile,
     validate_serving_config,
 )
+from inferscope.tools.pmax_scheduler import recommend_pmax_schedule
 from inferscope.tools.recommend import (
     recommend_config,
     recommend_engine,
@@ -304,6 +305,31 @@ def disagg(
 ):
     """Determine if prefill/decode disaggregation would help."""
     _print_result(recommend_disaggregation(model, gpu, 500.0, avg_prompt, rate, rdma, num_gpus))
+
+
+@app.command(name="pmax-recommend")
+def pmax_recommend_cmd(
+    batch_size: int = typer.Option(32, help="Rollout batch size"),
+    base_pmax: int = typer.Option(2048, help="Baseline max_tokens per prompt"),
+    strategy: str = typer.Option("variance_scaled", help="Strategy: fixed, variance_scaled, truncation_aware, bimodal"),
+    gpu_token_budget: int = typer.Option(65536, help="Total token budget across the batch"),
+    reward_history_file: str = typer.Option("", help="JSON file with reward history from previous batches"),
+):
+    """Recommend adaptive P_max schedule for RL rollout batches."""
+    history = None
+    if reward_history_file:
+        import json
+        from pathlib import Path
+        history = json.loads(Path(reward_history_file).read_text())
+        if not isinstance(history, list):
+            history = [history]
+    _print_result(recommend_pmax_schedule(
+        batch_size=batch_size,
+        base_pmax=base_pmax,
+        strategy=strategy,
+        reward_history=history,
+        gpu_token_budget=gpu_token_budget,
+    ))
 
 
 @app.command(name="quantization")
