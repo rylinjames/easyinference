@@ -43,6 +43,14 @@ from inferscope.benchmarks.kv_disagg_transfer import KVDisaggTransferResult, run
 from inferscope.benchmarks.kv_pressure_ramp import KVPressureProfileResult, run_kv_pressure_ramp
 from inferscope.benchmarks.openai_replay import build_default_artifact_path, run_openai_replay
 from inferscope.benchmarks.procedural import ProceduralWorkloadOptions
+from inferscope.benchmarks.rollout_diff import (
+    RolloutDiffArtifact,
+    RolloutDiffSummary,
+    RolloutEntry,
+    TokenDivergence,
+    diff_rollouts,
+    load_rollout_log,
+)
 from inferscope.benchmarks.prometheus_capture import capture_endpoint_snapshot, capture_metrics_targets
 from inferscope.benchmarks.support import (
     BenchmarkSupportIssue,
@@ -96,4 +104,10 @@ __all__ = [
     "run_kv_disagg_transfer",
     "run_kv_pressure_ramp",
     "run_openai_replay",
+    "RolloutDiffArtifact",
+    "RolloutDiffSummary",
+    "RolloutEntry",
+    "TokenDivergence",
+    "diff_rollouts",
+    "load_rollout_log",
 ]

@@ -17,6 +17,7 @@ from inferscope.benchmarks import (
     run_openai_replay,
 )
 from inferscope.benchmarks.probe_resolution import resolve_probe_plan
+from inferscope.benchmarks.rollout_diff import diff_rollouts
 from inferscope.endpoint_auth import parse_header_values
 from inferscope.production_target import (
     build_benchmark_readiness_summary,
@@ -327,6 +328,59 @@ def register_benchmark_commands(
         except Exception as exc:  # noqa: BLE001
             raise typer.BadParameter(str(exc)) from exc
         print_result(compare_benchmark_artifacts(baseline_artifact, candidate_artifact))
+
+    @app.command(name="rollout-diff")
+    def rollout_diff_cmd(
+        training_log: Annotated[Path, typer.Argument(help="JSONL log from training rollout engine (veRL/OpenRLHF)")],
+        serving_log: Annotated[Path, typer.Argument(help="JSONL log from serving engine replay (vLLM/SGLang)")],
+        threshold: Annotated[float, typer.Option(help="Absolute log-prob delta threshold for flagging divergence")] = 0.01,
+        top_k: Annotated[int, typer.Option(help="Top-K most divergent tokens to report per request")] = 10,
+        output: Annotated[Path | None, typer.Option(help="Where to write the diff artifact JSON")] = None,
+    ):
+        """Diff per-token log-probs between training rollout and serving replay."""
+        if not training_log.exists():
+            raise typer.BadParameter(f"Training log not found: {training_log}")
+        if not serving_log.exists():
+            raise typer.BadParameter(f"Serving log not found: {serving_log}")
+
+        artifact = diff_rollouts(
+            training_log,
+            serving_log,
+            threshold=threshold,
+            top_k=top_k,
+        )
+
+        if output is None:
+            from inferscope.config import settings
+            output = settings.benchmark_dir / artifact.default_filename
+
+        saved_path = artifact.save_json(output)
+        summary = artifact.summary
+        print_result(
+            {
+                "summary": (
+                    f"Rollout diff: {summary.divergent_requests}/{summary.total_requests} requests divergent "
+                    f"| {summary.divergent_tokens}/{summary.total_tokens} tokens above threshold "
+                    f"| max delta={summary.max_abs_delta:.4f} "
+                    f"| p95 delta={summary.p95_abs_delta:.4f}"
+                ),
+                "artifact_path": str(saved_path),
+                "severity_counts": summary.severity_counts,
+                "position_histogram": summary.position_histogram,
+                "threshold": threshold,
+                "model": artifact.model,
+                "critical_requests": [
+                    {
+                        "request_id": rd.request_id,
+                        "max_delta": rd.max_abs_delta,
+                        "divergent_tokens": rd.divergent_tokens,
+                        "top_token": rd.top_divergences[0].token_text if rd.top_divergences else "",
+                    }
+                    for rd in artifact.request_diffs
+                    if rd.severity == "critical"
+                ],
+            }
+        )
 
     @app.command(name="validate-production-lane")
     def validate_production_lane_cmd(

@@ -13,6 +13,7 @@ from inferscope.benchmarks import (
     load_benchmark_artifact,
     run_openai_replay,
 )
+from inferscope.benchmarks.rollout_diff import diff_rollouts
 from inferscope.benchmarks.probe_resolution import (
     BenchmarkSupportError,
     ProbeResolutionError,
@@ -377,6 +378,55 @@ def register_benchmark_tools(mcp: FastMCP) -> None:
             "production_target": build_production_contract(),
             "confidence": 1.0,
             "evidence": "saved_benchmark_artifact",
+        }
+
+    @mcp.tool()
+    async def tool_compare_rollouts(
+        training_log: str,
+        serving_log: str,
+        threshold: float = 0.01,
+        top_k: int = 10,
+        save_artifact: bool = True,
+    ) -> dict[str, Any]:
+        """Diff per-token log-probs between a training rollout and serving replay to detect numerical parity bugs."""
+        training_path = _resolve_artifact_path_for_mcp(training_log)
+        serving_path = _resolve_artifact_path_for_mcp(serving_log)
+        try:
+            artifact = diff_rollouts(
+                training_path,
+                serving_path,
+                threshold=threshold,
+                top_k=top_k,
+            )
+        except Exception as exc:  # noqa: BLE001
+            return {
+                "error": str(exc),
+                "summary": "Failed to diff rollout logs",
+                "confidence": 1.0,
+                "evidence": "rollout_diff_execution",
+            }
+        artifact_path = ""
+        if save_artifact:
+            from inferscope.config import settings
+            save_to = settings.benchmark_dir / artifact.default_filename
+            artifact_path = str(artifact.save_json(save_to))
+        summary = artifact.summary
+        return {
+            "summary": (
+                f"Rollout diff: {summary.divergent_requests}/{summary.total_requests} requests divergent "
+                f"| max delta={summary.max_abs_delta:.4f} | p95={summary.p95_abs_delta:.4f}"
+            ),
+            "artifact_path": artifact_path,
+            "diff_id": artifact.diff_id,
+            "severity_counts": summary.severity_counts,
+            "position_histogram": summary.position_histogram,
+            "divergent_requests": summary.divergent_requests,
+            "divergent_tokens": summary.divergent_tokens,
+            "total_tokens": summary.total_tokens,
+            "threshold": threshold,
+            "model": artifact.model,
+            "confidence": 0.9,
+            "evidence": "rollout_diff_analysis",
         }
 
     @mcp.tool()

@@ -434,6 +434,76 @@ def _estimate_recompute_vs_transfer(
     }
 
 
+def estimate_kv_quant_savings(
+    model: str,
+    gpu: str,
+    context_length: int = 32768,
+    batch_size: int = 32,
+) -> dict[str, Any]:
+    """Estimate memory savings and capacity gain from FP8 vs FP16 KV cache quantization."""
+    variant, error = _resolve_supported_model(model)
+    if error is not None:
+        return error
+    gpu_profile, error = _resolve_supported_gpu(gpu)
+    if error is not None:
+        return error
+
+    kv_layers = variant.serving.get("kv_layers", variant.layers)
+
+    fp16_per_token = variant.kv_cache_bytes_per_token("fp16") * kv_layers
+    fp8_per_token = variant.kv_cache_bytes_per_token("fp8") * kv_layers
+
+    fp16_total_gb = (fp16_per_token * context_length * batch_size) / (1024**3)
+    fp8_total_gb = (fp8_per_token * context_length * batch_size) / (1024**3)
+
+    savings_gb = fp16_total_gb - fp8_total_gb
+    savings_pct = (savings_gb / fp16_total_gb * 100) if fp16_total_gb > 0 else 0
+
+    mem_fp16 = plan_memory(
+        model=variant, gpu=gpu_profile,
+        num_gpus=1, tp=1,
+        precision="fp8", kv_precision="fp16",
+    )
+    mem_fp8 = plan_memory(
+        model=variant, gpu=gpu_profile,
+        num_gpus=1, tp=1,
+        precision="fp8", kv_precision="fp8_e4m3",
+    )
+
+    fp16_headroom = mem_fp16.kv_cache_budget_gb if mem_fp16.fits else 0
+    fp8_headroom = mem_fp8.kv_cache_budget_gb if mem_fp8.fits else 0
+    extra_sessions = 0
+    if fp16_per_token > 0:
+        per_session_fp16_gb = (fp16_per_token * context_length) / (1024**3)
+        if per_session_fp16_gb > 0:
+            extra_sessions = int((fp8_headroom - fp16_headroom) / per_session_fp16_gb)
+
+    return {
+        "kv_quant_comparison": {
+            "fp16_kv_total_gb": round(fp16_total_gb, 3),
+            "fp8_kv_total_gb": round(fp8_total_gb, 3),
+            "savings_gb": round(savings_gb, 3),
+            "savings_pct": round(savings_pct, 1),
+            "extra_concurrent_sessions": max(extra_sessions, 0),
+            "fp16_per_token_bytes": round(fp16_per_token, 1),
+            "fp8_per_token_bytes": round(fp8_per_token, 1),
+        },
+        "context_length": context_length,
+        "batch_size": batch_size,
+        "model": variant.name,
+        "gpu": gpu_profile.name,
+        "target_profile": PRODUCTION_TARGET_NAME,
+        "summary": (
+            f"FP8 KV saves {savings_pct:.0f}% memory ({savings_gb:.1f} GB) for "
+            f"{variant.name} @ {context_length // 1024}K × {batch_size} on {gpu_profile.name}. "
+            f"Enables ~{max(extra_sessions, 0)} additional concurrent sessions."
+        ),
+        "confidence": 0.9,
+        "evidence": "kv_quantization_memory_model",
+        "reference": "vLLM #38171 (TurboQuant, 113 upvotes)",
+    }
+
+
 def compare_quantization(model: str, gpu: str) -> dict:
     """Compare the supported quantization options for the production lane."""
     variant, error = _resolve_supported_model(model)

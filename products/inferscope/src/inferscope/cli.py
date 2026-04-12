@@ -28,6 +28,7 @@ from inferscope.tools.hardware_intel import compare_gpus, get_gpu_specs
 from inferscope.tools.kv_cache import (
     calculate_kv_budget,
     compare_quantization,
+    estimate_kv_quant_savings,
     recommend_disaggregation,
     recommend_kv_strategy,
 )
@@ -312,6 +313,17 @@ def quantization_cmd(
 ):
     """Compare quantization options for this model + GPU."""
     _print_result(compare_quantization(model, gpu))
+
+
+@app.command(name="kv-quant-estimate")
+def kv_quant_estimate_cmd(
+    model: str = typer.Argument(help="Model name"),
+    gpu: str = typer.Argument(help="GPU type"),
+    context_length: int = typer.Option(32768, help="Context length in tokens"),
+    batch_size: int = typer.Option(32, help="Concurrent batch size"),
+):
+    """Estimate memory savings from FP8 vs FP16 KV cache quantization."""
+    _print_result(estimate_kv_quant_savings(model, gpu, context_length, batch_size))
 
 
 @app.command()
